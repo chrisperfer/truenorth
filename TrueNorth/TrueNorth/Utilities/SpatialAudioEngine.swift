@@ -183,26 +183,34 @@ class SpatialAudioEngine: ObservableObject {
         // When user faces East (90°), we need to rotate listener -90° so sound stays north
         let angleRadians = -heading * .pi / 180
         
+        // AMPLIFIED: Multiply rotation by 5x to make effect more noticeable
+        let amplifiedAngle = angleRadians * 5.0
+        
         // Rotate listener in opposite direction to keep sound at North
         let listenerOrientation = AVAudio3DAngularOrientation(
-            yaw: Float(angleRadians),  // Negative rotation to compensate
+            yaw: Float(amplifiedAngle),  // Amplified rotation
             pitch: 0,
             roll: 0
         )
         
         environmentNode.listenerAngularOrientation = listenerOrientation
         
-        // Force the audio graph to update
+        // Also try moving the source position based on rotation to make it more obvious
+        let rotatedX = sin(angleRadians) * 30.0  // Move source left/right based on rotation
+        let rotatedZ = cos(angleRadians) * 20.0  // Keep distance but rotate position
+        
+        // Force the audio graph to update with rotated position
         if audioEngine.isRunning {
-            // Trigger position update to ensure the audio graph processes the orientation change
-            playerNode.position = AVAudio3DPoint(x: sourceX, y: sourceY, z: sourceZ)
+            // Update source position to rotate around listener
+            playerNode.position = AVAudio3DPoint(x: Float(rotatedX), y: sourceY, z: Float(rotatedZ))
+            playerNode.reverbBlend = min(1.0, sqrt(Float(rotatedX*rotatedX) + sourceY*sourceY + Float(rotatedZ*rotatedZ)) / 50.0)
         }
         
-        // Debug output
-        if Int(heading) % 30 == 0 {
-            print("Heading: \(Int(heading))°, Listener yaw: \(Int(angleRadians * 180 / .pi))°")
-            print("Listener orientation: yaw=\(listenerOrientation.yaw), pitch=\(listenerOrientation.pitch), roll=\(listenerOrientation.roll)")
-            print("Sound source at: (\(sourceX), \(sourceY), \(sourceZ))")
+        // Debug output - show every 10 degrees for more feedback
+        if Int(heading) % 10 == 0 {
+            print("Heading: \(Int(heading))°, Amplified yaw: \(Int(amplifiedAngle * 180 / .pi))°")
+            print("Listener orientation: yaw=\(listenerOrientation.yaw)")
+            print("Rotated source position: (\(rotatedX), \(sourceY), \(rotatedZ))")
         }
     }
     
