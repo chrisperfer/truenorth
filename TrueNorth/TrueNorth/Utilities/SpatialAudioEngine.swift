@@ -4,6 +4,9 @@ import Combine
 class SpatialAudioEngine: ObservableObject {
     @Published var isPlaying: Bool = false
     @Published var volume: Float = 0.5
+    @Published var sourceX: Float = 0
+    @Published var sourceY: Float = 0
+    @Published var sourceZ: Float = 20
     
     private var audioEngine = AVAudioEngine()
     private var environmentNode = AVAudioEnvironmentNode()
@@ -18,6 +21,9 @@ class SpatialAudioEngine: ObservableObject {
         setupAudioEngine()
         generateAudioBuffer()
         testBasicAudio()
+        
+        // Set initial position
+        updateSourcePosition(x: sourceX, y: sourceY, z: sourceZ)
     }
     
     private func testBasicAudio() {
@@ -46,16 +52,26 @@ class SpatialAudioEngine: ObservableObject {
         audioEngine.attach(environmentNode)
         audioEngine.attach(playerNode)
         
-        // Use stereo format for compatibility
-        let stereoFormat = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)!
+        // Get the output format from the engine
+        let outputFormat = audioEngine.outputNode.outputFormat(forBus: 0)
+        print("Output format: \(outputFormat.channelCount) channels at \(outputFormat.sampleRate)Hz")
         
-        audioEngine.connect(playerNode, to: environmentNode, format: stereoFormat)
-        audioEngine.connect(environmentNode, to: audioEngine.outputNode, format: nil)
+        // For spatial audio, use mono format for the source
+        let monoFormat = AVAudioFormat(standardFormatWithSampleRate: outputFormat.sampleRate, channels: 1)!
+        
+        // Connect with appropriate formats:
+        // - Player to Environment: mono (spatial source)
+        // - Environment to Output: stereo (spatialized output)
+        audioEngine.connect(playerNode, to: environmentNode, format: monoFormat)
+        audioEngine.connect(environmentNode, to: audioEngine.outputNode, format: outputFormat)
         
         configureEnvironment()
         
         do {
             try audioEngine.start()
+            print("Audio engine started with spatial audio support")
+            print("Player -> Environment format: \(monoFormat)")
+            print("Environment -> Output format: \(outputFormat)")
         } catch {
             print("Failed to start audio engine: \(error)")
         }
@@ -70,9 +86,12 @@ class SpatialAudioEngine: ObservableObject {
         
         // Use HRTF for headphone spatialization
         environmentNode.renderingAlgorithm = .HRTFHQ
+        print("Environment rendering algorithm: \(environmentNode.renderingAlgorithm)")
         
-        // Disable reverb for clearer directional audio
-        environmentNode.reverbParameters.enable = false
+        // Enable reverb to help with spatialization
+        environmentNode.reverbParameters.enable = true
+        environmentNode.reverbParameters.level = -20
+        environmentNode.reverbParameters.loadFactoryReverbPreset(.mediumHall)
         
         // Set listener at origin facing forward (north)
         environmentNode.listenerPosition = AVAudio3DPoint(x: 0, y: 0, z: 0)
@@ -80,7 +99,7 @@ class SpatialAudioEngine: ObservableObject {
         
         // Position sound source north of listener
         // In AVAudio3D: +X is right, +Y is up, +Z is forward (north)
-        playerNode.position = AVAudio3DPoint(x: 0, y: 0, z: 20)
+        playerNode.position = AVAudio3DPoint(x: sourceX, y: sourceY, z: sourceZ)
         playerNode.renderingAlgorithm = .HRTFHQ
         playerNode.volume = volume
         
@@ -88,7 +107,10 @@ class SpatialAudioEngine: ObservableObject {
         playerNode.occlusion = 0
         playerNode.obstruction = 0
         
-        print("Environment configured: Source at (0,0,20), Listener at (0,0,0)")
+        // Output final format
+        print("Environment output format: \(environmentNode.outputFormat(forBus: 0))")
+        print("Environment configured: Source at (\(sourceX),\(sourceY),\(sourceZ)), Listener at (0,0,0)")
+        print("Player rendering algorithm: \(playerNode.renderingAlgorithm)")
     }
     
     private func generateAudioBuffer() {
@@ -96,8 +118,8 @@ class SpatialAudioEngine: ObservableObject {
         let duration: TimeInterval = 1.0
         let frameCount = AVAudioFrameCount(sampleRate * duration)
         
-        // Use stereo format to match the audio engine setup
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!, frameCapacity: frameCount) else {
+        // Create mono buffer for spatial audio source
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!, frameCapacity: frameCount) else {
             print("Failed to create audio buffer")
             return
         }
@@ -111,59 +133,76 @@ class SpatialAudioEngine: ObservableObject {
         // Generate random seed for consistent white noise
         var seed: UInt64 = 12345
         
-        // Fill both channels with the same data
-        for channel in 0..<2 {
-            guard let channelData = buffer.floatChannelData?[channel] else { 
-                print("Failed to get channel data for channel \(channel)")
-                continue
-            }
+        // Fill mono channel
+        guard let channelData = buffer.floatChannelData?[0] else {
+            print("Failed to get channel data")
+            return
+        }
+        
+        for frame in 0..<Int(frameCount) {
+            let time = Double(frame) / sampleRate
             
-            // Reset seed for each channel to ensure identical data
-            seed = 12345
-            
-            for frame in 0..<Int(frameCount) {
-                let time = Double(frame) / sampleRate
+            // Generate 3 clicks
+            var sample: Float = 0
+            for clickIndex in 0..<3 {
+                let clickStart = Double(clickIndex) * clickSpacing
+                let clickEnd = clickStart + clickDuration
                 
-                // Generate 3 clicks
-                var sample: Float = 0
-                for clickIndex in 0..<3 {
-                    let clickStart = Double(clickIndex) * clickSpacing
-                    let clickEnd = clickStart + clickDuration
-                    
-                    if time >= clickStart && time < clickEnd {
-                        // Simple click sound (bandpass filtered noise)
-                        seed = seed &* 1664525 &+ 1013904223
-                        let noise = Float(Int32(bitPattern: UInt32(seed >> 32))) / Float(Int32.max)
-                        sample = noise * 0.4
-                    }
+                if time >= clickStart && time < clickEnd {
+                    // Simple click sound (bandpass filtered noise)
+                    seed = seed &* 1664525 &+ 1013904223
+                    let noise = Float(Int32(bitPattern: UInt32(seed >> 32))) / Float(Int32.max)
+                    sample = noise * 0.4
                 }
-                
-                channelData[frame] = sample
             }
+            
+            channelData[frame] = sample
         }
         
         audioBuffer = buffer
-        print("Audio buffer generated successfully with 2 channels")
+        print("Audio buffer generated successfully with mono channel")
+    }
+    
+    func updateSourcePosition(x: Float, y: Float, z: Float) {
+        sourceX = x
+        sourceY = y
+        sourceZ = z
+        
+        // For real-time position updates with HRTF, we need to update during playback
+        playerNode.position = AVAudio3DPoint(x: x, y: y, z: z)
+        
+        // Also update the reverberation blend to help with distance perception
+        playerNode.reverbBlend = min(1.0, sqrt(x*x + y*y + z*z) / 50.0)
+        
+        print("Source position updated to: (\(x), \(y), \(z)), reverb blend: \(playerNode.reverbBlend)")
     }
     
     func updateOrientation(heading: Double) {
         // Convert heading to radians
         // Heading 0 = North, 90 = East, 180 = South, 270 = West
-        // We need to rotate the listener so the sound stays at North
-        let angleRadians = heading * .pi / 180
+        // When user faces East (90°), we need to rotate listener -90° so sound stays north
+        let angleRadians = -heading * .pi / 180
         
         // Rotate listener in opposite direction to keep sound at North
         let listenerOrientation = AVAudio3DAngularOrientation(
-            yaw: Float(angleRadians),  // Positive rotation to compensate
+            yaw: Float(angleRadians),  // Negative rotation to compensate
             pitch: 0,
             roll: 0
         )
         
         environmentNode.listenerAngularOrientation = listenerOrientation
         
+        // Force the audio graph to update
+        if audioEngine.isRunning {
+            // Trigger position update to ensure the audio graph processes the orientation change
+            playerNode.position = AVAudio3DPoint(x: sourceX, y: sourceY, z: sourceZ)
+        }
+        
         // Debug output
         if Int(heading) % 30 == 0 {
             print("Heading: \(Int(heading))°, Listener yaw: \(Int(angleRadians * 180 / .pi))°")
+            print("Listener orientation: yaw=\(listenerOrientation.yaw), pitch=\(listenerOrientation.pitch), roll=\(listenerOrientation.roll)")
+            print("Sound source at: (\(sourceX), \(sourceY), \(sourceZ))")
         }
     }
     
@@ -178,11 +217,19 @@ class SpatialAudioEngine: ObservableObject {
             return
         }
         
-        // Configure audio session when starting playback
+        // Configure audio session for spatial audio
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [.allowBluetooth])
+            // Use .playback category with spatial audio options
+            try session.setCategory(.playback, mode: .default, options: [.allowBluetooth, .allowAirPlay])
+            
+            // Enable spatial audio playback
+            if #available(iOS 15.0, *) {
+                try session.setSupportsMultichannelContent(true)
+            }
+            
             try session.setActive(true)
+            print("Audio session configured for spatial audio")
         } catch {
             print("Failed to activate audio session: \(error)")
         }
@@ -198,11 +245,15 @@ class SpatialAudioEngine: ObservableObject {
             }
         }
         
+        // Ensure initial position is set
+        playerNode.position = AVAudio3DPoint(x: sourceX, y: sourceY, z: sourceZ)
+        playerNode.reverbBlend = min(1.0, sqrt(sourceX*sourceX + sourceY*sourceY + sourceZ*sourceZ) / 50.0)
+        
         print("Scheduling buffer...")
         playerNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
         playerNode.play()
         isPlaying = true
-        print("Playback started")
+        print("Playback started with position: (\(sourceX), \(sourceY), \(sourceZ))")
     }
     
     func stopPlayingTone() {

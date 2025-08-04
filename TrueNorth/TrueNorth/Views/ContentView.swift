@@ -63,6 +63,45 @@ struct ContentView: View {
                             .font(.caption)
                             .foregroundColor(.orange)
                     }
+                    
+                    // 3D Position Controls for testing
+                    VStack(spacing: 10) {
+                        Text("3D Position Test")
+                            .font(.headline)
+                        
+                        HStack {
+                            Text("X:")
+                            Slider(value: $audioEngine.sourceX, in: -30...30)
+                            Text("\(Int(audioEngine.sourceX))")
+                                .frame(width: 30)
+                        }
+                        
+                        HStack {
+                            Text("Y:")
+                            Slider(value: $audioEngine.sourceY, in: -10...10)
+                            Text("\(Int(audioEngine.sourceY))")
+                                .frame(width: 30)
+                        }
+                        
+                        HStack {
+                            Text("Z:")
+                            Slider(value: $audioEngine.sourceZ, in: -30...30)
+                            Text("\(Int(audioEngine.sourceZ))")
+                                .frame(width: 30)
+                        }
+                        
+                        Button("Reset to North") {
+                            audioEngine.updateSourcePosition(x: 0, y: 0, z: 20)
+                        }
+                        .font(.caption)
+                        
+                        Text("X=right/left, Y=up/down, Z=forward/back")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding()
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(10)
                 }
                 
                 if orientationManager.calibrationNeeded {
@@ -116,6 +155,9 @@ struct ContentView: View {
         .onReceive(orientationManager.$combinedHeading.throttle(for: .milliseconds(50), scheduler: DispatchQueue.main, latest: true)) { newHeading in
             audioEngine.updateOrientation(heading: newHeading)
         }
+        .onChange(of: audioEngine.sourceX) { _ in updateAudioPosition() }
+        .onChange(of: audioEngine.sourceY) { _ in updateAudioPosition() }
+        .onChange(of: audioEngine.sourceZ) { _ in updateAudioPosition() }
         .sheet(isPresented: $showingSettings) {
             SettingsView()
         }
@@ -127,6 +169,14 @@ struct ContentView: View {
         } else {
             audioEngine.startPlayingTone()
         }
+    }
+    
+    private func updateAudioPosition() {
+        audioEngine.updateSourcePosition(
+            x: audioEngine.sourceX,
+            y: audioEngine.sourceY,
+            z: audioEngine.sourceZ
+        )
     }
 }
 
