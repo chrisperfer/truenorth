@@ -115,7 +115,7 @@ class SpatialAudioEngine: ObservableObject {
     
     private func generateAudioBuffer() {
         let sampleRate: Double = 44100
-        let duration: TimeInterval = 1.0
+        let duration: TimeInterval = 2.0  // 2 second loop
         let frameCount = AVAudioFrameCount(sampleRate * duration)
         
         // Create mono buffer for spatial audio source
@@ -126,12 +126,12 @@ class SpatialAudioEngine: ObservableObject {
         
         buffer.frameLength = frameCount
         
-        // Create a simple clicking pattern
-        let clickDuration = 0.02 // 20ms per click
-        let clickSpacing = 0.2 // 200ms between clicks
-        
-        // Generate random seed for consistent white noise
-        var seed: UInt64 = 12345
+        // Submarine ping parameters
+        let pingFrequency: Double = 1500.0  // 1.5 kHz - classic submarine ping frequency
+        let pingDuration: Double = 0.15     // 150ms ping
+        let pingInterval: Double = 1.5      // Ping every 1.5 seconds
+        let echoDelay: Double = 0.3        // Echo after 300ms
+        let echoAttenuation: Float = 0.3   // Echo is 30% of original
         
         // Fill mono channel
         guard let channelData = buffer.floatChannelData?[0] else {
@@ -141,26 +141,39 @@ class SpatialAudioEngine: ObservableObject {
         
         for frame in 0..<Int(frameCount) {
             let time = Double(frame) / sampleRate
-            
-            // Generate 3 clicks
             var sample: Float = 0
-            for clickIndex in 0..<3 {
-                let clickStart = Double(clickIndex) * clickSpacing
-                let clickEnd = clickStart + clickDuration
-                
-                if time >= clickStart && time < clickEnd {
-                    // Simple click sound (bandpass filtered noise)
-                    seed = seed &* 1664525 &+ 1013904223
-                    let noise = Float(Int32(bitPattern: UInt32(seed >> 32))) / Float(Int32.max)
-                    sample = noise * 0.4
-                }
+            
+            // Calculate position within the ping interval
+            let cycleTime = time.truncatingRemainder(dividingBy: pingInterval)
+            
+            // Main ping
+            if cycleTime < pingDuration {
+                let pingTime = cycleTime / pingDuration
+                // Exponential envelope for more natural ping sound
+                let envelope = Float(exp(-3.0 * pingTime))
+                // Sine wave with slight frequency sweep downward
+                let frequency = pingFrequency * (1.0 - 0.1 * pingTime)
+                sample = sin(Float(2.0 * .pi * frequency * cycleTime)) * envelope * 0.7
             }
+            
+            // Echo
+            let echoStart = echoDelay
+            let echoEnd = echoDelay + pingDuration
+            if cycleTime >= echoStart && cycleTime < echoEnd {
+                let echoTime = (cycleTime - echoStart) / pingDuration
+                let envelope = Float(exp(-4.0 * echoTime)) * echoAttenuation
+                let frequency = pingFrequency * 0.9 * (1.0 - 0.15 * echoTime)
+                sample += sin(Float(2.0 * .pi * frequency * (cycleTime - echoStart))) * envelope
+            }
+            
+            // Apply soft clipping to prevent harsh distortion
+            sample = tanh(sample)
             
             channelData[frame] = sample
         }
         
         audioBuffer = buffer
-        print("Audio buffer generated successfully with mono channel")
+        print("Audio buffer generated: Submarine ping sound (1.5kHz, 150ms ping, 1.5s interval)")
     }
     
     func updateSourcePosition(x: Float, y: Float, z: Float) {
@@ -183,34 +196,34 @@ class SpatialAudioEngine: ObservableObject {
         // When user faces East (90°), we need to rotate listener -90° so sound stays north
         let angleRadians = -heading * .pi / 180
         
-        // AMPLIFIED: Multiply rotation by 5x to make effect more noticeable
-        let amplifiedAngle = angleRadians * 5.0
+        // Apply 2x amplification to make the effect more noticeable but not excessive
+        let amplifiedAngle = angleRadians * 2.0
         
         // Rotate listener in opposite direction to keep sound at North
         let listenerOrientation = AVAudio3DAngularOrientation(
-            yaw: Float(amplifiedAngle),  // Amplified rotation
+            yaw: Float(amplifiedAngle),  // 2x amplification for better spatial perception
             pitch: 0,
             roll: 0
         )
         
         environmentNode.listenerAngularOrientation = listenerOrientation
         
-        // Also try moving the source position based on rotation to make it more obvious
-        let rotatedX = sin(angleRadians) * 30.0  // Move source left/right based on rotation
-        let rotatedZ = cos(angleRadians) * 20.0  // Keep distance but rotate position
+        // Also subtly adjust source position to enhance the effect
+        // Move source slightly based on rotation to improve spatial cues
+        let enhancementFactor: Float = 10.0  // Subtle movement
+        let enhancedX = sourceX + Float(sin(angleRadians)) * enhancementFactor
+        let enhancedZ = sourceZ + Float(cos(angleRadians) - 1.0) * enhancementFactor
         
-        // Force the audio graph to update with rotated position
+        // Force the audio graph to update
         if audioEngine.isRunning {
-            // Update source position to rotate around listener
-            playerNode.position = AVAudio3DPoint(x: Float(rotatedX), y: sourceY, z: Float(rotatedZ))
-            playerNode.reverbBlend = min(1.0, sqrt(Float(rotatedX*rotatedX) + sourceY*sourceY + Float(rotatedZ*rotatedZ)) / 50.0)
+            playerNode.position = AVAudio3DPoint(x: enhancedX, y: sourceY, z: enhancedZ)
+            playerNode.reverbBlend = min(1.0, sqrt(enhancedX*enhancedX + sourceY*sourceY + enhancedZ*enhancedZ) / 50.0)
         }
         
-        // Debug output - show every 10 degrees for more feedback
-        if Int(heading) % 10 == 0 {
-            print("Heading: \(Int(heading))°, Amplified yaw: \(Int(amplifiedAngle * 180 / .pi))°")
-            print("Listener orientation: yaw=\(listenerOrientation.yaw)")
-            print("Rotated source position: (\(rotatedX), \(sourceY), \(rotatedZ))")
+        // Debug output every 15 degrees
+        if Int(heading) % 15 == 0 {
+            print("Heading: \(Int(heading))°, Listener yaw: \(Int(amplifiedAngle * 180 / .pi))°")
+            print("Enhanced source position: (\(enhancedX), \(sourceY), \(enhancedZ))")
         }
     }
     
