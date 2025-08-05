@@ -63,45 +63,6 @@ struct ContentView: View {
                             .font(.caption)
                             .foregroundColor(.orange)
                     }
-                    
-                    // 3D Position Controls for testing
-                    VStack(spacing: 10) {
-                        Text("3D Position Test")
-                            .font(.headline)
-                        
-                        HStack {
-                            Text("X:")
-                            Slider(value: $audioEngine.sourceX, in: -30...30)
-                            Text("\(Int(audioEngine.sourceX))")
-                                .frame(width: 30)
-                        }
-                        
-                        HStack {
-                            Text("Y:")
-                            Slider(value: $audioEngine.sourceY, in: -10...10)
-                            Text("\(Int(audioEngine.sourceY))")
-                                .frame(width: 30)
-                        }
-                        
-                        HStack {
-                            Text("Z:")
-                            Slider(value: $audioEngine.sourceZ, in: -30...30)
-                            Text("\(Int(audioEngine.sourceZ))")
-                                .frame(width: 30)
-                        }
-                        
-                        Button("Reset to North") {
-                            audioEngine.updateSourcePosition(x: 0, y: 0, z: 20)
-                        }
-                        .font(.caption)
-                        
-                        Text("X=right/left, Y=up/down, Z=forward/back")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding()
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(10)
                 }
                 
                 if orientationManager.calibrationNeeded {
@@ -129,6 +90,25 @@ struct ContentView: View {
                     InfoRow(icon: "arrow.triangle.merge", 
                            label: "Combined Heading", 
                            value: "\(Int(orientationManager.combinedHeading))°")
+                    
+                    // Pocket Mode Toggle
+                    Button(action: {
+                        orientationManager.togglePocketMode()
+                    }) {
+                        HStack {
+                            Image(systemName: orientationManager.isPocketMode ? "lock.fill" : "lock.open")
+                                .frame(width: 25)
+                                .foregroundColor(orientationManager.isPocketMode ? .orange : .blue)
+                            Text("Pocket Mode")
+                                .font(.subheadline)
+                            Spacer()
+                            Text(orientationManager.isPocketMode ? "Locked" : "Unlocked")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(orientationManager.isPocketMode ? .orange : .secondary)
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
                 .padding()
                 .background(Color.gray.opacity(0.1))
@@ -155,9 +135,6 @@ struct ContentView: View {
         .onReceive(orientationManager.$combinedHeading.throttle(for: .milliseconds(50), scheduler: DispatchQueue.main, latest: true)) { newHeading in
             audioEngine.updateOrientation(heading: newHeading)
         }
-        .onChange(of: audioEngine.sourceX) { _ in updateAudioPosition() }
-        .onChange(of: audioEngine.sourceY) { _ in updateAudioPosition() }
-        .onChange(of: audioEngine.sourceZ) { _ in updateAudioPosition() }
         .sheet(isPresented: $showingSettings) {
             SettingsView()
         }
@@ -169,14 +146,6 @@ struct ContentView: View {
         } else {
             audioEngine.startPlayingTone()
         }
-    }
-    
-    private func updateAudioPosition() {
-        audioEngine.updateSourcePosition(
-            x: audioEngine.sourceX,
-            y: audioEngine.sourceY,
-            z: audioEngine.sourceZ
-        )
     }
 }
 
@@ -222,6 +191,7 @@ struct SettingsView: View {
                         Text("3. Hold your device flat and rotate to calibrate")
                         Text("4. Press 'Start North Tone' to begin")
                         Text("5. The sound will always come from North")
+                        Text("6. Use 'Pocket Mode' to lock north when putting phone in pocket")
                     }
                     .font(.caption)
                     .padding(.vertical, 5)

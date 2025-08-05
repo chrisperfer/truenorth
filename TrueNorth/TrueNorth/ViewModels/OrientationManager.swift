@@ -10,28 +10,55 @@ class OrientationManager: NSObject, ObservableObject {
     @Published var isHeadTrackingActive: Bool = false
     @Published var headingAccuracy: Double = -1
     @Published var calibrationNeeded: Bool = false
+    @Published var isPocketMode: Bool = false
     
     private let motionManager = CMHeadphoneMotionManager()
     private let locationManager = CLLocationManager()
+    private let deviceMotion = CMMotionManager()
     private var headTrackingTimer: Timer?
     
     private let smoothingFactor: Double = 0.1
     private var previousHeading: Double = 0
     
+    // Pocket mode variables
+    private var lockedNorthReference: Double = 0
+    private var initialHeadOrientation: CMAttitude?
+    private var lastStableHeading: Double = 0
+    private var headingStabilityCount: Int = 0
+    private let stabilityThreshold: Double = 5.0 // degrees
+    private let stabilityCountRequired: Int = 5
+    
     override init() {
         super.init()
         setupLocationManager()
         setupHeadTracking()
+        setupDeviceMotion()
     }
     
     func start() {
         locationManager.startUpdatingHeading()
         startHeadTracking()
+        startDeviceMotionTracking()
     }
     
     func stop() {
         locationManager.stopUpdatingHeading()
         stopHeadTracking()
+        stopDeviceMotionTracking()
+    }
+    
+    func togglePocketMode() {
+        isPocketMode.toggle()
+        if isPocketMode {
+            lockNorthReference()
+        }
+        print("Pocket mode: \(isPocketMode ? "ON" : "OFF")")
+    }
+    
+    private func lockNorthReference() {
+        lockedNorthReference = deviceHeading
+        initialHeadOrientation = headRotation
+        print("North reference locked at: \(Int(lockedNorthReference))°")
     }
     
     private func setupLocationManager() {
@@ -42,6 +69,51 @@ class OrientationManager: NSObject, ObservableObject {
     
     private func setupHeadTracking() {
         checkHeadphoneConnection()
+    }
+    
+    private func setupDeviceMotion() {
+        deviceMotion.deviceMotionUpdateInterval = 0.1
+    }
+    
+    private func startDeviceMotionTracking() {
+        guard deviceMotion.isDeviceMotionAvailable else { return }
+        
+        deviceMotion.startDeviceMotionUpdates(to: .main) { [weak self] motion, error in
+            guard let self = self, let motion = motion else { return }
+            
+            // Detect significant phone movement
+            let rotationRate = motion.rotationRate
+            let totalRotation = abs(rotationRate.x) + abs(rotationRate.y) + abs(rotationRate.z)
+            
+            // If phone is moving significantly and we're in pocket mode, maintain locked reference
+            if totalRotation > 0.5 && self.isPocketMode {
+                // Phone is moving - use locked reference
+                return
+            }
+            
+            // Check for heading stability when not in pocket mode
+            if !self.isPocketMode {
+                self.checkHeadingStability()
+            }
+        }
+    }
+    
+    private func stopDeviceMotionTracking() {
+        deviceMotion.stopDeviceMotionUpdates()
+    }
+    
+    private func checkHeadingStability() {
+        let headingDifference = abs(deviceHeading - lastStableHeading)
+        
+        if headingDifference < stabilityThreshold {
+            headingStabilityCount += 1
+            if headingStabilityCount >= stabilityCountRequired {
+                lastStableHeading = deviceHeading
+            }
+        } else {
+            headingStabilityCount = 0
+            lastStableHeading = deviceHeading
+        }
     }
     
     private func checkHeadphoneConnection() {
@@ -70,20 +142,33 @@ class OrientationManager: NSObject, ObservableObject {
     }
     
     private func updateCombinedOrientation() {
-        var finalHeading = deviceHeading
+        var finalHeading: Double
         
-        if let attitude = headRotation {
-            let headYaw = attitude.yaw * 180 / .pi
-            finalHeading = normalizeAngle(deviceHeading - headYaw)
-            
-            // Debug output
-            if abs(headYaw) > 5 {
-                print("Head tracking: Device: \(Int(deviceHeading))°, Head Yaw: \(Int(headYaw))°, Combined: \(Int(finalHeading))°")
+        if isPocketMode {
+            // In pocket mode, use locked reference + head rotation only
+            if let attitude = headRotation, let initial = initialHeadOrientation {
+                // Calculate relative rotation from initial orientation
+                let relativeYaw = (attitude.yaw - initial.yaw) * 180 / .pi
+                finalHeading = normalizeAngle(lockedNorthReference - relativeYaw)
+                
+                if Int(relativeYaw) % 15 == 0 {
+                    print("Pocket mode - Locked ref: \(Int(lockedNorthReference))°, Head rotation: \(Int(relativeYaw))°, Final: \(Int(finalHeading))°")
+                }
+            } else {
+                finalHeading = lockedNorthReference
             }
         } else {
-            // Debug when no head tracking
-            if Int(deviceHeading) % 30 == 0 {
-                print("No head tracking active, using device heading: \(Int(deviceHeading))°")
+            // Normal mode - use device heading + head rotation
+            finalHeading = deviceHeading
+            
+            if let attitude = headRotation {
+                let headYaw = attitude.yaw * 180 / .pi
+                finalHeading = normalizeAngle(deviceHeading - headYaw)
+                
+                // Debug output
+                if abs(headYaw) > 5 {
+                    print("Normal mode - Device: \(Int(deviceHeading))°, Head Yaw: \(Int(headYaw))°, Combined: \(Int(finalHeading))°")
+                }
             }
         }
         

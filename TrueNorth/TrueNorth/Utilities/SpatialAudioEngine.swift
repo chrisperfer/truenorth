@@ -4,9 +4,11 @@ import Combine
 class SpatialAudioEngine: ObservableObject {
     @Published var isPlaying: Bool = false
     @Published var volume: Float = 0.5
-    @Published var sourceX: Float = 0
-    @Published var sourceY: Float = 0
-    @Published var sourceZ: Float = 20
+    
+    // Fixed position for north sound source
+    private var sourceX: Float = 0
+    private var sourceY: Float = 0
+    private var sourceZ: Float = 20
     
     private var audioEngine = AVAudioEngine()
     private var environmentNode = AVAudioEnvironmentNode()
