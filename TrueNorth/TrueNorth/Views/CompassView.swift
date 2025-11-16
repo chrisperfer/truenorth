@@ -4,6 +4,8 @@ struct CompassView: View {
     let heading: Double
     let isHeadTrackingActive: Bool
     let headingAccuracy: Double
+    let deviceHeading: Double
+    let headOffset: Double
     
     private let compassSize: CGFloat = 250
     
@@ -33,21 +35,44 @@ struct CompassView: View {
             }
             
             Image(systemName: "location.north.fill")
-                .font(.system(size: 40))
+                .font(.system(size: 60))
                 .foregroundColor(.red)
                 .rotationEffect(.degrees(-heading))
                 .animation(.easeInOut(duration: 0.3), value: heading)
             
-            VStack {
-                Text("\(Int(heading))°")
-                    .font(.system(size: 36, weight: .semibold))
-                    .foregroundColor(.primary)
+            HStack(alignment: .bottom, spacing: 20) {
+                // Device heading (smaller, left)
+                Text("\(Int(deviceHeading))°")
+                    .font(.system(size: 20, design: .monospaced))
+                    .foregroundColor(.secondary)
+                    .frame(width: 50, alignment: .trailing)
+                    .alignmentGuide(.bottom) { d in d[.bottom] }
                 
-                if headingAccuracy > 0 {
-                    Text("±\(Int(headingAccuracy))°")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                // Combined heading (prominent, center)
+                VStack(spacing: 2) {
+                    Text("\(Int(heading))°")
+                        .font(.system(size: 36, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.primary)
+                        .frame(width: 90)
+                    
+                    if headingAccuracy > 0 {
+                        Text("±\(Int(headingAccuracy))°")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    } else {
+                        // Placeholder to maintain spacing
+                        Text(" ")
+                            .font(.system(size: 12))
+                    }
                 }
+                .frame(width: 90)
+                
+                // Head offset (smaller, right) - format with sign and padding
+                Text(String(format: "%+4d°", Int(headOffset)))
+                    .font(.system(size: 20, design: .monospaced))
+                    .foregroundColor(isHeadTrackingActive ? .green : .secondary)
+                    .frame(width: 60, alignment: .leading)
+                    .alignmentGuide(.bottom) { d in d[.bottom] }
             }
             .offset(y: compassSize / 2 + 40)
             
@@ -74,6 +99,6 @@ struct CompassView: View {
 
 struct CompassView_Previews: PreviewProvider {
     static var previews: some View {
-        CompassView(heading: 45, isHeadTrackingActive: true, headingAccuracy: 5)
+        CompassView(heading: 45, isHeadTrackingActive: true, headingAccuracy: 5, deviceHeading: 50, headOffset: -5)
     }
 }

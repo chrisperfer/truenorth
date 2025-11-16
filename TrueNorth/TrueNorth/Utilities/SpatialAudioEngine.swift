@@ -5,10 +5,17 @@ class SpatialAudioEngine: ObservableObject {
     @Published var isPlaying: Bool = false
     @Published var volume: Float = 0.5
     
-    // Fixed position for north sound source
-    private var sourceX: Float = 0
-    private var sourceY: Float = 0
-    private var sourceZ: Float = 20
+    // Position for sound source (now public for experimental view)
+    @Published var sourceX: Float = 0
+    @Published var sourceY: Float = 0
+    @Published var sourceZ: Float = 20
+    
+    // Tone parameters
+    private var toneFrequency: Float = 1500
+    private var pingDuration: Float = 0.15
+    private var pingInterval: Float = 1.5
+    private var echoDelay: Float = 0.3
+    private var echoAttenuation: Float = 0.3
     
     private var audioEngine = AVAudioEngine()
     private var environmentNode = AVAudioEnvironmentNode()
@@ -128,12 +135,12 @@ class SpatialAudioEngine: ObservableObject {
         
         buffer.frameLength = frameCount
         
-        // Submarine ping parameters
-        let pingFrequency: Double = 1500.0  // 1.5 kHz - classic submarine ping frequency
-        let pingDuration: Double = 0.15     // 150ms ping
-        let pingInterval: Double = 1.5      // Ping every 1.5 seconds
-        let echoDelay: Double = 0.3        // Echo after 300ms
-        let echoAttenuation: Float = 0.3   // Echo is 30% of original
+        // Submarine ping parameters (use class properties)
+        let pingFrequency: Double = Double(toneFrequency)  // Use configurable frequency
+        let pingDuration: Double = Double(self.pingDuration)
+        let pingInterval: Double = Double(self.pingInterval)
+        let echoDelay: Double = Double(self.echoDelay)
+        let echoAttenuation: Float = self.echoAttenuation
         
         // Fill mono channel
         guard let channelData = buffer.floatChannelData?[0] else {
@@ -195,8 +202,8 @@ class SpatialAudioEngine: ObservableObject {
     func updateOrientation(heading: Double) {
         // Convert heading to radians
         // Heading 0 = North, 90 = East, 180 = South, 270 = West
-        // When user faces East (90°), we need to rotate listener -90° so sound stays north
-        let angleRadians = -heading * .pi / 180
+        // When user faces away from north, rotate listener to keep sound at north
+        let angleRadians = heading * .pi / 180
         
         // Apply 2x amplification to make the effect more noticeable but not excessive
         let amplifiedAngle = angleRadians * 2.0
@@ -213,7 +220,7 @@ class SpatialAudioEngine: ObservableObject {
         // Also subtly adjust source position to enhance the effect
         // Move source slightly based on rotation to improve spatial cues
         let enhancementFactor: Float = 10.0  // Subtle movement
-        let enhancedX = sourceX + Float(sin(angleRadians)) * enhancementFactor
+        let enhancedX = sourceX - Float(sin(angleRadians)) * enhancementFactor
         let enhancedZ = sourceZ + Float(cos(angleRadians) - 1.0) * enhancementFactor
         
         // Force the audio graph to update
@@ -287,6 +294,63 @@ class SpatialAudioEngine: ObservableObject {
     func setVolume(_ newVolume: Float) {
         volume = newVolume
         playerNode.volume = volume
+    }
+    
+    // MARK: - Experimental Controls
+    
+    func setReverbLevel(_ level: Float) {
+        environmentNode.reverbParameters.level = level
+    }
+    
+    func setReverbBlend(_ blend: Float) {
+        playerNode.reverbBlend = blend
+    }
+    
+    func setObstruction(_ value: Float) {
+        playerNode.obstruction = value
+    }
+    
+    func setOcclusion(_ value: Float) {
+        playerNode.occlusion = value
+    }
+    
+    func setToneFrequency(_ frequency: Float) {
+        toneFrequency = frequency
+    }
+    
+    func setPingDuration(_ duration: Float) {
+        pingDuration = duration
+    }
+    
+    func setPingInterval(_ interval: Float) {
+        pingInterval = interval
+    }
+    
+    func setEchoDelay(_ delay: Float) {
+        echoDelay = delay
+    }
+    
+    func setEchoAttenuation(_ attenuation: Float) {
+        echoAttenuation = attenuation
+    }
+    
+    func setDistanceAttenuation(maxDistance: Float, referenceDistance: Float, rolloffFactor: Float) {
+        environmentNode.distanceAttenuationParameters.maximumDistance = maxDistance
+        environmentNode.distanceAttenuationParameters.referenceDistance = referenceDistance
+        environmentNode.distanceAttenuationParameters.rolloffFactor = rolloffFactor
+    }
+    
+    func regenerateTone() {
+        let wasPlaying = isPlaying
+        if wasPlaying {
+            stopPlayingTone()
+        }
+        
+        generateAudioBuffer()
+        
+        if wasPlaying {
+            startPlayingTone()
+        }
     }
     
     deinit {
