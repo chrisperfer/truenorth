@@ -110,7 +110,7 @@ struct ContentView: View {
             orientationManager.stop()
             audioEngine.stopPlayingTone()
         }
-        .onReceive(orientationManager.$combinedHeading.throttle(for: .milliseconds(50), scheduler: DispatchQueue.main, latest: true)) { newHeading in
+        .onReceive(orientationManager.$combinedHeading.throttle(for: .milliseconds(16), scheduler: DispatchQueue.main, latest: true)) { newHeading in
             audioEngine.updateOrientation(heading: newHeading)
         }
         .sheet(isPresented: $showingSettings) {

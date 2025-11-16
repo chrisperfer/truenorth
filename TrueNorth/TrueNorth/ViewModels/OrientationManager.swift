@@ -17,7 +17,7 @@ class OrientationManager: NSObject, ObservableObject {
     private let deviceMotion = CMMotionManager()
     private var headTrackingTimer: Timer?
     
-    private let smoothingFactor: Double = 0.1
+    private let smoothingFactor: Double = 0.4  // Faster response while maintaining smoothness
     private var previousHeading: Double = 0
     
     // Pocket mode variables

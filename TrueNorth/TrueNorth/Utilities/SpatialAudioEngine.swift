@@ -92,11 +92,19 @@ class SpatialAudioEngine: ObservableObject {
         environmentNode.distanceAttenuationParameters.referenceDistance = 1
         environmentNode.distanceAttenuationParameters.rolloffFactor = 1
         environmentNode.distanceAttenuationParameters.distanceAttenuationModel = .exponential
-        
+
         // Use HRTF for headphone spatialization
         environmentNode.renderingAlgorithm = .HRTFHQ
-        print("Environment rendering algorithm: \(environmentNode.renderingAlgorithm)")
-        
+        print("Environment rendering algorithm set to: .HRTFHQ")
+
+        // Validate that HRTF is actually active
+        if environmentNode.renderingAlgorithm != .HRTFHQ {
+            print("⚠️ WARNING: HRTF not available on this device - spatial audio may not work properly")
+            print("   Actual rendering algorithm: \(environmentNode.renderingAlgorithm)")
+        } else {
+            print("✓ HRTF rendering confirmed active")
+        }
+
         // Enable reverb to help with spatialization
         environmentNode.reverbParameters.enable = true
         environmentNode.reverbParameters.level = -20
@@ -204,35 +212,28 @@ class SpatialAudioEngine: ObservableObject {
         // Heading 0 = North, 90 = East, 180 = South, 270 = West
         // When user faces away from north, rotate listener to keep sound at north
         let angleRadians = heading * .pi / 180
-        
-        // Apply 2x amplification to make the effect more noticeable but not excessive
-        let amplifiedAngle = angleRadians * 2.0
-        
-        // Rotate listener in opposite direction to keep sound at North
+
+        // Use 1:1 rotation mapping for accurate north tracking
+        // The listener rotates to match the user's heading, keeping north fixed in world space
         let listenerOrientation = AVAudio3DAngularOrientation(
-            yaw: Float(amplifiedAngle),  // 2x amplification for better spatial perception
+            yaw: Float(angleRadians),
             pitch: 0,
             roll: 0
         )
-        
+
         environmentNode.listenerAngularOrientation = listenerOrientation
-        
-        // Also subtly adjust source position to enhance the effect
-        // Move source slightly based on rotation to improve spatial cues
-        let enhancementFactor: Float = 10.0  // Subtle movement
-        let enhancedX = sourceX - Float(sin(angleRadians)) * enhancementFactor
-        let enhancedZ = sourceZ + Float(cos(angleRadians) - 1.0) * enhancementFactor
-        
-        // Force the audio graph to update
+
+        // Keep sound source fixed at north - no position enhancement
+        // The spatial audio engine handles the spatialization through listener rotation
         if audioEngine.isRunning {
-            playerNode.position = AVAudio3DPoint(x: enhancedX, y: sourceY, z: enhancedZ)
-            playerNode.reverbBlend = min(1.0, sqrt(enhancedX*enhancedX + sourceY*sourceY + enhancedZ*enhancedZ) / 50.0)
+            playerNode.position = AVAudio3DPoint(x: sourceX, y: sourceY, z: sourceZ)
+            playerNode.reverbBlend = min(1.0, sqrt(sourceX*sourceX + sourceY*sourceY + sourceZ*sourceZ) / 50.0)
         }
-        
+
         // Debug output every 15 degrees
         if Int(heading) % 15 == 0 {
-            print("Heading: \(Int(heading))°, Listener yaw: \(Int(amplifiedAngle * 180 / .pi))°")
-            print("Enhanced source position: (\(enhancedX), \(sourceY), \(enhancedZ))")
+            print("Heading: \(Int(heading))°, Listener yaw: \(Int(angleRadians * 180 / .pi))°")
+            print("Source position: (\(sourceX), \(sourceY), \(sourceZ))")
         }
     }
     
