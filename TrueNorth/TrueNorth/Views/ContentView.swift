@@ -22,39 +22,51 @@ struct ContentView: View {
                             if offset > 180 { offset -= 360 }
                             if offset < -180 { offset += 360 }
                             return offset
-                        }()
+                        }(),
+                        volume: $audioEngine.volume,
+                        onVolumeChange: { newVolume in
+                            audioEngine.setVolume(newVolume)
+                        }
                     )
-                    
-                    // Pocket Mode Lock Button
-                    Button(action: {
-                        orientationManager.togglePocketMode()
-                    }) {
-                        Image(systemName: orientationManager.isPocketMode ? "lock.fill" : "lock.open")
-                            .font(.system(size: 28))
-                            .foregroundColor(orientationManager.isPocketMode ? .orange : .gray)
+
+                    HStack(spacing: 20) {
+                        // Head Tracking Calibration Button
+                        Button(action: {
+                            orientationManager.calibrateHeadTracking()
+                        }) {
+                            VStack(spacing: 4) {
+                                Image(systemName: "scope")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(orientationManager.isHeadTrackingActive ? .green : .gray)
+                                Text("Zero")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(orientationManager.isHeadTrackingActive ? .green : .gray)
+                            }
                             .frame(width: 60, height: 60)
                             .background(Circle().fill(Color.gray.opacity(0.1)))
+                        }
+                        .disabled(!orientationManager.isHeadTrackingActive)
+
+                        // Pocket Mode Lock Button
+                        Button(action: {
+                            orientationManager.togglePocketMode()
+                        }) {
+                            VStack(spacing: 4) {
+                                Image(systemName: orientationManager.isPocketMode ? "lock.fill" : "lock.open")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(orientationManager.isPocketMode ? .orange : .gray)
+                                Text("Lock")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(orientationManager.isPocketMode ? .orange : .gray)
+                            }
+                            .frame(width: 60, height: 60)
+                            .background(Circle().fill(Color.gray.opacity(0.1)))
+                        }
                     }
                 }
                 .padding()
-                
+
                 VStack(spacing: 20) {
-                    // Volume control
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Image(systemName: "speaker.wave.2")
-                            Text("Volume")
-                            Spacer()
-                            Text("\(Int(audioEngine.volume * 100))%")
-                        }
-                        .font(.subheadline)
-                        
-                        Slider(value: $audioEngine.volume, in: 0...1) { _ in
-                            audioEngine.setVolume(audioEngine.volume)
-                        }
-                    }
-                    .padding(.horizontal)
-                    
                     // Tone controls list
                     VStack(spacing: 0) {
                         // North tone
@@ -136,25 +148,25 @@ struct SettingsView: View {
     // 3D Position
     @State private var positionX: Float = 0
     @State private var positionY: Float = 0
-    @State private var positionZ: Float = 20
-    
+    @State private var positionZ: Float = -20
+
     // Audio parameters
     @State private var reverbLevel: Float = -20
     @State private var reverbBlend: Float = 0.0
     @State private var obstruction: Float = 0.0
     @State private var occlusion: Float = 0.0
-    
+
     // Tone parameters
-    @State private var frequency: Float = 1500
+    @State private var frequency: Float = 607.27
     @State private var pingDuration: Float = 0.15
-    @State private var pingInterval: Float = 1.5
-    @State private var echoDelay: Float = 0.3
-    @State private var echoAttenuation: Float = 0.3
-    
+    @State private var pingInterval: Float = 20.0
+    @State private var echoDelay: Float = 20.0
+    @State private var echoAttenuation: Float = 0.28
+
     // Distance attenuation
-    @State private var maxDistance: Float = 100
-    @State private var referenceDistance: Float = 1
-    @State private var rolloffFactor: Float = 1
+    @State private var maxDistance: Float = 282.88
+    @State private var referenceDistance: Float = 1.08
+    @State private var rolloffFactor: Float = 0.70
     
     var body: some View {
         NavigationView {
@@ -268,11 +280,11 @@ struct SettingsView: View {
                                 audioEngine.setPingDuration(pingDuration)
                             }
                             
-                            SliderControl(label: "Ping Interval (s)", value: $pingInterval, range: 0.5...3) { _ in
+                            SliderControl(label: "Ping Interval (s)", value: $pingInterval, range: 0.5...90) { _ in
                                 audioEngine.setPingInterval(pingInterval)
                             }
-                            
-                            SliderControl(label: "Echo Delay (s)", value: $echoDelay, range: 0.1...1) { _ in
+
+                            SliderControl(label: "Echo Delay (s)", value: $echoDelay, range: 0.1...90) { _ in
                                 audioEngine.setEchoDelay(echoDelay)
                             }
                             
@@ -331,11 +343,11 @@ struct SettingsView: View {
                                 Button("North") {
                                     positionX = 0
                                     positionY = 0
-                                    positionZ = 20
+                                    positionZ = -20
                                     audioEngine.updateSourcePosition(x: positionX, y: positionY, z: positionZ)
                                 }
                                 .buttonStyle(.bordered)
-                                
+
                                 Button("East") {
                                     positionX = 20
                                     positionY = 0
@@ -343,7 +355,7 @@ struct SettingsView: View {
                                     audioEngine.updateSourcePosition(x: positionX, y: positionY, z: positionZ)
                                 }
                                 .buttonStyle(.bordered)
-                                
+
                                 Button("Above") {
                                     positionX = 0
                                     positionY = 20
@@ -351,11 +363,11 @@ struct SettingsView: View {
                                     audioEngine.updateSourcePosition(x: positionX, y: positionY, z: positionZ)
                                 }
                                 .buttonStyle(.bordered)
-                                
+
                                 Button("Far") {
                                     positionX = 0
                                     positionY = 0
-                                    positionZ = 50
+                                    positionZ = -50
                                     audioEngine.updateSourcePosition(x: positionX, y: positionY, z: positionZ)
                                 }
                                 .buttonStyle(.bordered)

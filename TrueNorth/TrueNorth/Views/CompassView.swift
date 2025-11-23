@@ -1,5 +1,26 @@
 import SwiftUI
 
+// Extension for corner radius on specific corners
+extension View {
+    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
+        clipShape(RoundedCorner(radius: radius, corners: corners))
+    }
+}
+
+struct RoundedCorner: Shape {
+    var radius: CGFloat = .infinity
+    var corners: UIRectCorner = .allCorners
+
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(
+            roundedRect: rect,
+            byRoundingCorners: corners,
+            cornerRadii: CGSize(width: radius, height: radius)
+        )
+        return Path(path.cgPath)
+    }
+}
+
 // Custom triangular arrow shape with notched base (like GPS pointer)
 struct TriangularArrow: Shape {
     func path(in rect: CGRect) -> Path {
@@ -71,6 +92,8 @@ struct CompassView: View {
     let deviceHeading: Double
     let smoothedDeviceHeading: Double
     let headOffset: Double
+    @Binding var volume: Float
+    let onVolumeChange: (Float) -> Void
 
     private let compassSize: CGFloat = 250
     private let alignmentThreshold: Double = 5.0  // Degrees tolerance for alignment
@@ -80,6 +103,10 @@ struct CompassView: View {
     @State private var previousHeading: Double = 0
     @State private var isAligned: Bool = false
     @State private var hapticGenerator = UIImpactFeedbackGenerator(style: .heavy)
+    @State private var tickHapticGenerator = UIImpactFeedbackGenerator(style: .light)
+    @State private var lastCrossedTick: Int = -1
+    @State private var showBottomSheet: Bool = true
+    @State private var selectedDetent: PresentationDetent = .height(120)
 
     var body: some View {
         ZStack {
@@ -96,11 +123,11 @@ struct CompassView: View {
                     .frame(width: compassSize, height: compassSize)
 
                 ForEach(0..<360, id: \.self) { degree in
-                    if degree % 30 == 0 {
+                    if degree % 10 == 0 {
                         Rectangle()
                             .fill(Color.primary)
-                            .frame(width: degree % 90 == 0 ? 3 : 1,
-                                   height: degree % 90 == 0 ? 20 : 10)
+                            .frame(width: degree % 90 == 0 ? 3 : (degree % 30 == 0 ? 1.5 : 1),
+                                   height: degree % 90 == 0 ? 20 : (degree % 30 == 0 ? 12 : 8))
                             .offset(y: -compassSize / 2 + 10)
                             .rotationEffect(.degrees(Double(degree)))
                     }
@@ -130,6 +157,13 @@ struct CompassView: View {
                 // Update cumulative rotation by the delta
                 cumulativeRotation += delta
                 previousHeading = newHeading
+
+                // Haptic feedback when crossing 10-degree marks
+                let currentTick = Int(newHeading / 10) % 36
+                if currentTick != lastCrossedTick {
+                    tickHapticGenerator.impactOccurred(intensity: 0.5)
+                    lastCrossedTick = currentTick
+                }
             }
             .onAppear {
                 // Initialize with current heading
@@ -153,47 +187,20 @@ struct CompassView: View {
                     .animation(.easeInOut(duration: 0.2), value: headOffset)
             }
 
-            HStack(alignment: .bottom, spacing: 20) {
-                // Device heading (smaller, left)
-                Text("\(Int(deviceHeading))°")
-                    .font(.system(size: 20, design: .monospaced))
-                    .foregroundColor(.secondary)
-                    .frame(width: 50, alignment: .trailing)
-                    .alignmentGuide(.bottom) { d in d[.bottom] }
-                
-                // Combined heading (prominent, center)
-                VStack(spacing: 2) {
-                    Text("\(Int(heading))°")
-                        .font(.system(size: 36, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.primary)
-                        .frame(width: 90)
-                    
-                    if headingAccuracy > 0 {
-                        Text("±\(Int(headingAccuracy))°")
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundColor(.secondary)
-                    } else {
-                        // Placeholder to maintain spacing
-                        Text(" ")
-                            .font(.system(size: 12))
-                    }
+            // Warning when AirPods not connected
+            if !isHeadTrackingActive {
+                VStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.orange)
+                    Text("No AirPods")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.orange)
                 }
-                .frame(width: 90)
-                
-                // Head offset (smaller, right) - format with sign and padding
-                Text(String(format: "%+4d°", Int(headOffset)))
-                    .font(.system(size: 20, design: .monospaced))
-                    .foregroundColor(isHeadTrackingActive ? .green : .secondary)
-                    .frame(width: 60, alignment: .leading)
-                    .alignmentGuide(.bottom) { d in d[.bottom] }
-            }
-            .offset(y: compassSize / 2 + 40)
-            
-            if isHeadTrackingActive {
-                Image(systemName: "airpodspro")
-                    .font(.system(size: 20))
-                    .foregroundColor(.green)
-                    .offset(x: -compassSize / 2 + 20, y: -compassSize / 2 + 20)
+                .padding(8)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(8)
+                .offset(x: -compassSize / 2 + 35, y: -compassSize / 2 + 35)
             }
         }
         .frame(width: compassSize + 60, height: compassSize + 100)
@@ -209,8 +216,25 @@ struct CompassView: View {
             isAligned = nowAligned
         }
         .onAppear {
-            // Prepare haptic generator
+            // Prepare haptic generators
             hapticGenerator.prepare()
+            tickHapticGenerator.prepare()
+        }
+        .sheet(isPresented: $showBottomSheet) {
+            BottomSheetContent(
+                volume: $volume,
+                onVolumeChange: onVolumeChange,
+                heading: heading,
+                deviceHeading: deviceHeading,
+                headOffset: headOffset,
+                headingAccuracy: headingAccuracy,
+                isHeadTrackingActive: isHeadTrackingActive,
+                selectedDetent: $selectedDetent
+            )
+            .presentationDetents([.height(120), .height(200), .medium], selection: $selectedDetent)
+            .presentationBackgroundInteraction(.enabled)
+            .presentationDragIndicator(.visible)
+            .interactiveDismissDisabled()
         }
     }
 
@@ -225,8 +249,108 @@ struct CompassView: View {
     }
 }
 
+// Bottom sheet content view
+struct BottomSheetContent: View {
+    @Binding var volume: Float
+    let onVolumeChange: (Float) -> Void
+    let heading: Double
+    let deviceHeading: Double
+    let headOffset: Double
+    let headingAccuracy: Double
+    let isHeadTrackingActive: Bool
+    @Binding var selectedDetent: PresentationDetent
+
+    var body: some View {
+        VStack(spacing: 16) {
+            // Volume control - always visible
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "speaker.wave.2")
+                        .foregroundColor(.secondary)
+                    Text("Volume")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(Int(volume * 100))%")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+
+                Slider(value: $volume, in: 0...1) { _ in
+                    onVolumeChange(volume)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+
+            // Debug info - visible at larger detents
+            if selectedDetent != .height(120) {
+                VStack(spacing: 8) {
+                    Divider()
+                        .padding(.horizontal, 20)
+
+                    HStack(alignment: .bottom, spacing: 20) {
+                        // Device heading
+                        VStack(spacing: 2) {
+                            Text("Device")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                            Text("\(Int(deviceHeading))°")
+                                .font(.system(size: 16, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+
+                        // Combined heading
+                        VStack(spacing: 2) {
+                            Text("Combined")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                            Text("\(Int(heading))°")
+                                .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                                .foregroundColor(.primary)
+
+                            if headingAccuracy > 0 {
+                                Text("±\(Int(headingAccuracy))°")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+
+                        // Head offset
+                        VStack(spacing: 2) {
+                            Text("Offset")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                            Text(String(format: "%+d°", Int(headOffset)))
+                                .font(.system(size: 16, design: .monospaced))
+                                .foregroundColor(isHeadTrackingActive ? .green : .secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .padding(.horizontal, 20)
+                }
+                .transition(.opacity)
+            }
+
+            Spacer()
+        }
+        .padding(.bottom, 20)
+    }
+}
+
 struct CompassView_Previews: PreviewProvider {
     static var previews: some View {
-        CompassView(heading: 45, isHeadTrackingActive: true, headingAccuracy: 5, deviceHeading: 50, smoothedDeviceHeading: 50, headOffset: -5)
+        CompassView(
+            heading: 45,
+            isHeadTrackingActive: true,
+            headingAccuracy: 5,
+            deviceHeading: 50,
+            smoothedDeviceHeading: 50,
+            headOffset: -5,
+            volume: .constant(0.5),
+            onVolumeChange: { _ in }
+        )
     }
 }
