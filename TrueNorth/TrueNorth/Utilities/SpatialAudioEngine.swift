@@ -210,30 +210,18 @@ class SpatialAudioEngine: ObservableObject {
     func updateOrientation(heading: Double) {
         // Convert heading to radians
         // Heading 0 = North, 90 = East, 180 = South, 270 = West
-        // When user faces away from north, rotate listener to keep sound at north
-        let angleRadians = heading * .pi / 180
+        let angleRadians = Float(heading * .pi / 180)
 
-        // Use 1:1 rotation mapping for accurate north tracking
-        // The listener rotates to match the user's heading, keeping north fixed in world space
-        let listenerOrientation = AVAudio3DAngularOrientation(
-            yaw: Float(angleRadians),
-            pitch: 0,
-            roll: 0
-        )
+        // POSITION-BASED APPROACH: Place sound source in the direction of north
+        // relative to user's current heading
+        // This is more direct than listener rotation
+        let distance: Float = 20.0  // meters
+        let northX = sin(angleRadians) * distance  // East-west component
+        let northZ = cos(angleRadians) * distance  // North-south component
 
-        environmentNode.listenerAngularOrientation = listenerOrientation
-
-        // Keep sound source fixed at north - no position enhancement
-        // The spatial audio engine handles the spatialization through listener rotation
         if audioEngine.isRunning {
-            playerNode.position = AVAudio3DPoint(x: sourceX, y: sourceY, z: sourceZ)
-            playerNode.reverbBlend = min(1.0, sqrt(sourceX*sourceX + sourceY*sourceY + sourceZ*sourceZ) / 50.0)
-        }
-
-        // Debug output every 15 degrees
-        if Int(heading) % 15 == 0 {
-            print("Heading: \(Int(heading))°, Listener yaw: \(Int(angleRadians * 180 / .pi))°")
-            print("Source position: (\(sourceX), \(sourceY), \(sourceZ))")
+            playerNode.position = AVAudio3DPoint(x: northX, y: sourceY, z: northZ)
+            playerNode.reverbBlend = min(1.0, distance / 50.0)
         }
     }
     

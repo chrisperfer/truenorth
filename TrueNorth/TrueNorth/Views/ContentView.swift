@@ -16,6 +16,7 @@ struct ContentView: View {
                         isHeadTrackingActive: orientationManager.isHeadTrackingActive,
                         headingAccuracy: orientationManager.headingAccuracy,
                         deviceHeading: orientationManager.deviceHeading,
+                        smoothedDeviceHeading: orientationManager.smoothedDeviceHeading,
                         headOffset: {
                             var offset = orientationManager.deviceHeading - orientationManager.combinedHeading
                             if offset > 180 { offset -= 360 }

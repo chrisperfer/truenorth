@@ -4,21 +4,23 @@ import CoreLocation
 import Combine
 
 class OrientationManager: NSObject, ObservableObject {
-    @Published var deviceHeading: Double = 0
+    @Published var deviceHeading: Double = 0  // Raw device heading
+    @Published var smoothedDeviceHeading: Double = 0  // Smoothed for UI display
     @Published var headRotation: CMAttitude?
     @Published var combinedHeading: Double = 0
     @Published var isHeadTrackingActive: Bool = false
     @Published var headingAccuracy: Double = -1
     @Published var calibrationNeeded: Bool = false
     @Published var isPocketMode: Bool = false
-    
+
     private let motionManager = CMHeadphoneMotionManager()
     private let locationManager = CLLocationManager()
     private let deviceMotion = CMMotionManager()
     private var headTrackingTimer: Timer?
-    
+
     private let smoothingFactor: Double = 0.4  // Faster response while maintaining smoothness
     private var previousHeading: Double = 0
+    private var previousDeviceHeading: Double = 0
     
     // Pocket mode variables
     private var lockedNorthReference: Double = 0
@@ -151,9 +153,6 @@ class OrientationManager: NSObject, ObservableObject {
                 let relativeYaw = (attitude.yaw - initial.yaw) * 180 / .pi
                 finalHeading = normalizeAngle(lockedNorthReference - relativeYaw)
                 
-                if Int(relativeYaw) % 15 == 0 {
-                    print("Pocket mode - Locked ref: \(Int(lockedNorthReference))°, Head rotation: \(Int(relativeYaw))°, Final: \(Int(finalHeading))°")
-                }
             } else {
                 finalHeading = lockedNorthReference
             }
@@ -164,11 +163,6 @@ class OrientationManager: NSObject, ObservableObject {
             if let attitude = headRotation {
                 let headYaw = attitude.yaw * 180 / .pi
                 finalHeading = normalizeAngle(deviceHeading - headYaw)
-                
-                // Debug output
-                if abs(headYaw) > 5 {
-                    print("Normal mode - Device: \(Int(deviceHeading))°, Head Yaw: \(Int(headYaw))°, Combined: \(Int(finalHeading))°")
-                }
             }
         }
         
@@ -177,19 +171,34 @@ class OrientationManager: NSObject, ObservableObject {
     
     private func smoothHeading(_ newHeading: Double) -> Double {
         var delta = newHeading - previousHeading
-        
+
         if delta > 180 {
             delta -= 360
         } else if delta < -180 {
             delta += 360
         }
-        
+
         let smoothedDelta = delta * smoothingFactor
         previousHeading = normalizeAngle(previousHeading + smoothedDelta)
-        
+
         return previousHeading
     }
-    
+
+    private func smoothDeviceHeading(_ newHeading: Double) -> Double {
+        var delta = newHeading - previousDeviceHeading
+
+        if delta > 180 {
+            delta -= 360
+        } else if delta < -180 {
+            delta += 360
+        }
+
+        let smoothedDelta = delta * smoothingFactor
+        previousDeviceHeading = normalizeAngle(previousDeviceHeading + smoothedDelta)
+
+        return previousDeviceHeading
+    }
+
     private func normalizeAngle(_ angle: Double) -> Double {
         var normalized = angle.truncatingRemainder(dividingBy: 360)
         if normalized < 0 {
@@ -202,7 +211,9 @@ class OrientationManager: NSObject, ObservableObject {
 extension OrientationManager: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
         let heading = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
+
         deviceHeading = heading
+        smoothedDeviceHeading = smoothDeviceHeading(heading)
         headingAccuracy = newHeading.headingAccuracy
         calibrationNeeded = newHeading.headingAccuracy < 0 || newHeading.headingAccuracy > 25
         updateCombinedOrientation()
