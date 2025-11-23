@@ -18,6 +18,52 @@ struct TriangularArrow: Shape {
     }
 }
 
+// Traditional 8-pointed compass rose pattern
+struct TraditionalCompassRose: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+
+        // Draw 8 points - 4 cardinal (longer) and 4 intercardinal (shorter)
+        for i in 0..<8 {
+            let angle = Double(i) * 45.0 - 90.0 // Start at top (North)
+            let isCardinal = i % 2 == 0
+            let outerLength = isCardinal ? radius * 0.95 : radius * 0.65
+            let innerWidth = isCardinal ? radius * 0.12 : radius * 0.08
+
+            // Calculate the 4 points of each diamond/rhombus
+            let angleRad = angle * .pi / 180.0
+            let leftAngleRad = (angle - 90) * .pi / 180.0
+            let rightAngleRad = (angle + 90) * .pi / 180.0
+
+            let tip = CGPoint(
+                x: center.x + CGFloat(cos(angleRad)) * outerLength,
+                y: center.y + CGFloat(sin(angleRad)) * outerLength
+            )
+
+            let leftEdge = CGPoint(
+                x: center.x + CGFloat(cos(leftAngleRad)) * innerWidth,
+                y: center.y + CGFloat(sin(leftAngleRad)) * innerWidth
+            )
+
+            let rightEdge = CGPoint(
+                x: center.x + CGFloat(cos(rightAngleRad)) * innerWidth,
+                y: center.y + CGFloat(sin(rightAngleRad)) * innerWidth
+            )
+
+            // Draw the diamond point
+            path.move(to: tip)
+            path.addLine(to: leftEdge)
+            path.addLine(to: center)
+            path.addLine(to: rightEdge)
+            path.closeSubpath()
+        }
+
+        return path
+    }
+}
+
 struct CompassView: View {
     let heading: Double
     let isHeadTrackingActive: Bool
@@ -40,6 +86,11 @@ struct CompassView: View {
             // Rotating compass rose - rotates based on DEVICE heading only (not head rotation)
             // This shows where your phone/body is pointing relative to north
             ZStack {
+                // Traditional 8-pointed compass rose pattern (subtle background)
+                TraditionalCompassRose()
+                    .fill(Color.primary.opacity(0.08))
+                    .frame(width: compassSize - 20, height: compassSize - 20)
+
                 Circle()
                     .stroke(Color.gray.opacity(0.3), lineWidth: 2)
                     .frame(width: compassSize, height: compassSize)
