@@ -1,5 +1,23 @@
 import SwiftUI
 
+// Custom triangular arrow shape with notched base (like GPS pointer)
+struct TriangularArrow: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+
+        let notchDepth: CGFloat = rect.height * 0.15  // 15% indent at base
+
+        // Create a triangular pointer with an indentation at the base
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))  // Top point
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))  // Bottom right
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY - notchDepth))  // Indent point (center)
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))  // Bottom left
+        path.closeSubpath()
+
+        return path
+    }
+}
+
 struct CompassView: View {
     let heading: Double
     let isHeadTrackingActive: Bool
@@ -9,10 +27,13 @@ struct CompassView: View {
     let headOffset: Double
 
     private let compassSize: CGFloat = 250
+    private let alignmentThreshold: Double = 5.0  // Degrees tolerance for alignment
 
     // Track cumulative rotation to avoid 360° wraparound issues
     @State private var cumulativeRotation: Double = 0
     @State private var previousHeading: Double = 0
+    @State private var isAligned: Bool = false
+    @State private var hapticGenerator = UIImpactFeedbackGenerator(style: .heavy)
 
     var body: some View {
         ZStack {
@@ -65,18 +86,22 @@ struct CompassView: View {
                 previousHeading = smoothedDeviceHeading
             }
 
-            // Fixed heading indicator - shows which way you're facing
-            VStack(spacing: 2) {
-                Image(systemName: "arrowtriangle.up.fill")
-                    .font(.system(size: 24))
-                    .foregroundColor(.blue)
+            // Fixed heading indicator (red) - shows which way you're facing - centered
+            TriangularArrow()
+                .fill(Color.red.opacity(0.7))  // Red arrow
+                .frame(width: 50, height: 60)
 
-                Text("You!")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.blue)
+            // Head tracking arrow (blue) - shows head direction relative to device
+            // Only visible when head tracking is active
+            // When aligned with red, creates purple overlay
+            if isHeadTrackingActive {
+                TriangularArrow()
+                    .fill(Color.blue.opacity(0.6))  // Blue arrow - overlays red to make purple when aligned
+                    .frame(width: 50, height: 60)
+                    .rotationEffect(.degrees(-headOffset))  // Negated to fix inversion
+                    .animation(.easeInOut(duration: 0.2), value: headOffset)
             }
-            .offset(y: -compassSize / 2 - 50)
-            
+
             HStack(alignment: .bottom, spacing: 20) {
                 // Device heading (smaller, left)
                 Text("\(Int(deviceHeading))°")
@@ -121,8 +146,23 @@ struct CompassView: View {
             }
         }
         .frame(width: compassSize + 60, height: compassSize + 100)
+        .onChange(of: headOffset) { newOffset in
+            // Check if arrows are now aligned
+            let nowAligned = abs(newOffset) < alignmentThreshold && isHeadTrackingActive
+
+            // Trigger haptic when transitioning to aligned state
+            if nowAligned && !isAligned {
+                hapticGenerator.impactOccurred()
+            }
+
+            isAligned = nowAligned
+        }
+        .onAppear {
+            // Prepare haptic generator
+            hapticGenerator.prepare()
+        }
     }
-    
+
     private func degrees(for direction: String) -> Double {
         switch direction {
         case "N": return 0
