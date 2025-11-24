@@ -19,6 +19,7 @@
 		A1A1A1AA2B1111110000003 /* ToneProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000011 /* ToneProfileStore.swift */; };
 		A1A1A1AB2B1111110000003 /* LocationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000012 /* LocationStore.swift */; };
 		A1A1A1AC2B1111110000004 /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000013 /* LocationService.swift */; };
+		A1A1A1AD2B1111110000004 /* BearingCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000014 /* BearingCalculator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +37,7 @@
 		A1A1A1A02B1111110000011 /* ToneProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToneProfileStore.swift; sourceTree = "<group>"; };
 		A1A1A1A02B1111110000012 /* LocationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationStore.swift; sourceTree = "<group>"; };
 		A1A1A1A02B1111110000013 /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
+		A1A1A1A02B1111110000014 /* BearingCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BearingCalculator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -129,6 +131,7 @@
 			children = (
 				A1A1A1A02B1111110000004 /* SpatialAudioEngine.swift */,
 				A1A1A1A02B1111110000008 /* SimpleToneGenerator.swift */,
+				A1A1A1A02B1111110000014 /* BearingCalculator.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -221,6 +224,7 @@
 				A1A1A1AA2B1111110000003 /* ToneProfileStore.swift in Sources */,
 				A1A1A1AB2B1111110000003 /* LocationStore.swift in Sources */,
 				A1A1A1AC2B1111110000004 /* LocationService.swift in Sources */,
+				A1A1A1AD2B1111110000004 /* BearingCalculator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
