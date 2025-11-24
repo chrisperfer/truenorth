@@ -12,6 +12,8 @@ class OrientationManager: NSObject, ObservableObject {
     @Published var headingAccuracy: Double = -1
     @Published var calibrationNeeded: Bool = false
     @Published var isPocketMode: Bool = false
+    @Published var userLocation: CLLocationCoordinate2D?
+    @Published var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
 
     private let motionManager = CMHeadphoneMotionManager()
     private let locationManager = CLLocationManager()
@@ -128,14 +130,18 @@ class OrientationManager: NSObject, ObservableObject {
     
     private func startHeadTracking() {
         guard !motionManager.isDeviceMotionActive else { return }
-        
+
         motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, error in
             guard let self = self, let motion = motion else { return }
-            
+
             self.headRotation = motion.attitude
             self.isHeadTrackingActive = true
             self.updateCombinedOrientation()
         }
+
+        // Enable user location tracking for waypoint bearings
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.startUpdatingLocation()
     }
     
     private func stopHeadTracking() {
@@ -218,8 +224,19 @@ extension OrientationManager: CLLocationManagerDelegate {
         calibrationNeeded = newHeading.headingAccuracy < 0 || newHeading.headingAccuracy > 25
         updateCombinedOrientation()
     }
-    
+
     func locationManagerShouldDisplayHeadingCalibration(_ manager: CLLocationManager) -> Bool {
         return true
+    }
+}
+
+// MARK: - User Location Updates
+extension OrientationManager {
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        userLocation = locations.last?.coordinate
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        locationAuthorizationStatus = manager.authorizationStatus
     }
 }
