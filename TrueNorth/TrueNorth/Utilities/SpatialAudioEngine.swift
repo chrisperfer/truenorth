@@ -41,6 +41,13 @@ class SpatialAudioEngine: ObservableObject {
     
     private let audioFormat = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)!
     private var cancellables = Set<AnyCancellable>()
+
+    // Multi-source management
+    private var playerNodes: [UUID: AVAudioPlayerNode] = [:]
+    private var audioBuffers: [UUID: AVAudioPCMBuffer] = [:]
+
+    // North special case
+    private let northId = UUID() // Static identifier for north direction
     
     init() {
         setupAudioSession()
