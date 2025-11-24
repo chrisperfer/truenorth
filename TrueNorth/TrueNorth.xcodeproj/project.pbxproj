@@ -21,6 +21,7 @@
 		A1A1A1AC2B1111110000004 /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000013 /* LocationService.swift */; };
 		A1A1A1AD2B1111110000004 /* BearingCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000014 /* BearingCalculator.swift */; };
 		A1A1A1AE2B1111110000005 /* AddLocationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000015 /* AddLocationView.swift */; };
+		A1A1A1AF2B1111110000005 /* LocationRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000016 /* LocationRow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 		A1A1A1A02B1111110000013 /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
 		A1A1A1A02B1111110000014 /* BearingCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BearingCalculator.swift; sourceTree = "<group>"; };
 		A1A1A1A02B1111110000015 /* AddLocationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddLocationView.swift; sourceTree = "<group>"; };
+		A1A1A1A02B1111110000016 /* LocationRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationRow.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,6 +93,7 @@
 				A1A1A1A02B1111110000001 /* ContentView.swift */,
 				A1A1A1A02B1111110000005 /* CompassView.swift */,
 				A1A1A1A02B1111110000015 /* AddLocationView.swift */,
+				A1A1A1A02B1111110000016 /* LocationRow.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -229,6 +232,7 @@
 				A1A1A1AC2B1111110000004 /* LocationService.swift in Sources */,
 				A1A1A1AD2B1111110000004 /* BearingCalculator.swift in Sources */,
 				A1A1A1AE2B1111110000005 /* AddLocationView.swift in Sources */,
+				A1A1A1AF2B1111110000005 /* LocationRow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
