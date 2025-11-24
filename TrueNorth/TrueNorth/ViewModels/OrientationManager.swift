@@ -47,6 +47,7 @@ class OrientationManager: NSObject, ObservableObject {
     
     func stop() {
         locationManager.stopUpdatingHeading()
+        locationManager.stopUpdatingLocation()
         stopHeadTracking()
         stopDeviceMotionTracking()
     }
