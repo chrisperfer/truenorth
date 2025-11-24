@@ -159,7 +159,11 @@ struct ContentView: View {
 struct SettingsView: View {
     @ObservedObject var audioEngine: SpatialAudioEngine
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var locationStore: LocationStore
+    @EnvironmentObject var toneProfileStore: ToneProfileStore
     @State private var selectedTab = 0
+    @State private var showingAddLocation = false
+    @State private var showNorthDirection = true
     
     // 3D Position
     @State private var positionX: Float = 0
@@ -229,15 +233,50 @@ struct SettingsView: View {
                     
                     Section(header: Text("Tips")) {
                         VStack(alignment: .leading, spacing: 10) {
-                            Label("Works best outdoors away from magnetic interference", 
+                            Label("Works best outdoors away from magnetic interference",
                                   systemImage: "tree")
-                            Label("Keep device flat for accurate readings", 
+                            Label("Keep device flat for accurate readings",
                                   systemImage: "iphone.radiowaves.left.and.right")
-                            Label("Head tracking requires AirPods Pro or Max", 
+                            Label("Head tracking requires AirPods Pro or Max",
                                   systemImage: "airpodspro")
                         }
                         .font(.caption)
                         .padding(.vertical, 5)
+                    }
+
+                    Section("Locations") {
+                        // North (always present, can be toggled)
+                        HStack {
+                            Toggle("North", isOn: $showNorthDirection)
+
+                            Spacer()
+
+                            Text("Default Tone")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        // Custom locations
+                        ForEach(locationStore.locations) { location in
+                            LocationRow(
+                                location: location,
+                                profileName: toneProfileStore.profile(withId: location.toneProfileId)?.name ?? "Unknown",
+                                isEnabled: Binding(
+                                    get: { location.isEnabled },
+                                    set: { _ in locationStore.toggle(location) }
+                                ),
+                                onDelete: {
+                                    locationStore.delete(location)
+                                }
+                            )
+                        }
+
+                        Button(action: { showingAddLocation = true }) {
+                            Label("Add Location", systemImage: "plus.circle.fill")
+                        }
+                    }
+                    .sheet(isPresented: $showingAddLocation) {
+                        AddLocationView()
                     }
                 }
                 .tabItem {
