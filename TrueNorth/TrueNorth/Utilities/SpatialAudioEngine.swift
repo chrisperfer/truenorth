@@ -12,11 +12,27 @@ class SpatialAudioEngine: ObservableObject {
     @Published var sourceZ: Float = -4
     
     // Tone parameters
-    private var toneFrequency: Float = 607.27
+    private var toneFrequency: Float = 830.0
     private var pingDuration: Float = 0.15
-    private var pingInterval: Float = 20.0
-    private var echoDelay: Float = 20.0
+    private var pingInterval: Float = 5.0
+    private var echoDelay: Float = 5.0
     private var echoAttenuation: Float = 0.28
+
+    // Harmonic parameters
+    private var fundamentalAmplitude: Float = 1.0
+    private var harmonic2Amplitude: Float = 1.0
+    private var harmonic3Amplitude: Float = 1.0
+    private var harmonic4Amplitude: Float = 1.0
+
+    // Transient parameters
+    private var transientFrequency: Float = 3000.0
+    private var transientAmplitude: Float = 0.3
+    private var transientDecay: Float = 50.0
+
+    // Envelope parameters
+    private var pingEnvelopeDecay: Float = 3.0
+    private var echoEnvelopeDecay: Float = 4.0
+    private var frequencySweepAmount: Float = 0.4  // 40% sweep
     
     private var audioEngine = AVAudioEngine()
     private var environmentNode = AVAudioEnvironmentNode()
@@ -127,7 +143,8 @@ class SpatialAudioEngine: ObservableObject {
     
     private func generateAudioBuffer() {
         let sampleRate: Double = 44100
-        let duration: TimeInterval = 2.0  // 2 second loop
+        // Use pingInterval as buffer duration (minimum 2 seconds for responsiveness)
+        let duration: TimeInterval = max(Double(pingInterval), 2.0)
         let frameCount = AVAudioFrameCount(sampleRate * duration)
 
         // Create mono buffer for spatial audio source
@@ -162,27 +179,27 @@ class SpatialAudioEngine: ObservableObject {
             if cycleTime < pingDuration {
                 let pingTime = cycleTime / pingDuration
                 // Exponential envelope for more natural ping sound
-                let envelope = Float(exp(-3.0 * pingTime))
+                let envelope = Float(exp(-Double(self.pingEnvelopeDecay) * pingTime))
                 // Frequency sweep for the fundamental
-                let frequency = pingFrequency * (1.0 - 0.1 * pingTime)
+                let frequency = pingFrequency * (1.0 - Double(self.frequencySweepAmount) * pingTime)
 
                 // Fundamental frequency
-                let fundamental = sin(Float(2.0 * .pi * frequency * cycleTime)) * envelope * 0.7
+                let fundamental = sin(Float(2.0 * .pi * frequency * cycleTime)) * envelope * self.fundamentalAmplitude
 
                 // Add harmonics for spectral richness (critical for HRTF filtering)
                 // 2nd harmonic (octave) - strong presence above 1.5 kHz threshold
-                let harmonic2 = sin(Float(2.0 * .pi * frequency * 2.0 * cycleTime)) * envelope * 0.4
+                let harmonic2 = sin(Float(2.0 * .pi * frequency * 2.0 * cycleTime)) * envelope * self.harmonic2Amplitude
 
                 // 3rd harmonic - adds brightness
-                let harmonic3 = sin(Float(2.0 * .pi * frequency * 3.0 * cycleTime)) * envelope * 0.25
+                let harmonic3 = sin(Float(2.0 * .pi * frequency * 3.0 * cycleTime)) * envelope * self.harmonic3Amplitude
 
                 // 4th harmonic - high frequency content for pinna cues
-                let harmonic4 = sin(Float(2.0 * .pi * frequency * 4.0 * cycleTime)) * envelope * 0.15
+                let harmonic4 = sin(Float(2.0 * .pi * frequency * 4.0 * cycleTime)) * envelope * self.harmonic4Amplitude
 
                 // Brief high-frequency transient click at onset for localization
                 // Critical for HRTF to provide front/back differentiation
-                let transientEnvelope = Float(exp(-50.0 * pingTime))  // Very fast decay
-                let transient = sin(Float(2.0 * .pi * 3000.0 * cycleTime)) * transientEnvelope * 0.3
+                let transientEnvelope = Float(exp(-Double(self.transientDecay) * pingTime))  // Very fast decay
+                let transient = sin(Float(2.0 * .pi * Double(self.transientFrequency) * cycleTime)) * transientEnvelope * self.transientAmplitude
 
                 // Mix all components
                 sample = fundamental + harmonic2 + harmonic3 + harmonic4 + transient
@@ -196,13 +213,13 @@ class SpatialAudioEngine: ObservableObject {
             let echoEnd = echoDelay + pingDuration
             if cycleTime >= echoStart && cycleTime < echoEnd {
                 let echoTime = (cycleTime - echoStart) / pingDuration
-                let envelope = Float(exp(-4.0 * echoTime)) * echoAttenuation
-                let frequency = pingFrequency * 0.9 * (1.0 - 0.15 * echoTime)
+                let envelope = Float(exp(-Double(self.echoEnvelopeDecay) * echoTime)) * echoAttenuation
+                let frequency = pingFrequency * 0.9 * (1.0 - Double(self.frequencySweepAmount) * 1.5 * echoTime)
 
                 // Echo also has harmonics but attenuated
-                let fundamental = sin(Float(2.0 * .pi * frequency * (cycleTime - echoStart))) * envelope * 0.7
-                let harmonic2 = sin(Float(2.0 * .pi * frequency * 2.0 * (cycleTime - echoStart))) * envelope * 0.3
-                let harmonic3 = sin(Float(2.0 * .pi * frequency * 3.0 * (cycleTime - echoStart))) * envelope * 0.15
+                let fundamental = sin(Float(2.0 * .pi * frequency * (cycleTime - echoStart))) * envelope * self.fundamentalAmplitude
+                let harmonic2 = sin(Float(2.0 * .pi * frequency * 2.0 * (cycleTime - echoStart))) * envelope * self.harmonic2Amplitude * 0.75
+                let harmonic3 = sin(Float(2.0 * .pi * frequency * 3.0 * (cycleTime - echoStart))) * envelope * self.harmonic3Amplitude * 0.6
 
                 sample += fundamental + harmonic2 + harmonic3
             }
@@ -364,15 +381,58 @@ class SpatialAudioEngine: ObservableObject {
         environmentNode.distanceAttenuationParameters.referenceDistance = referenceDistance
         environmentNode.distanceAttenuationParameters.rolloffFactor = rolloffFactor
     }
-    
+
+    // Harmonic controls
+    func setFundamentalAmplitude(_ amplitude: Float) {
+        fundamentalAmplitude = amplitude
+    }
+
+    func setHarmonic2Amplitude(_ amplitude: Float) {
+        harmonic2Amplitude = amplitude
+    }
+
+    func setHarmonic3Amplitude(_ amplitude: Float) {
+        harmonic3Amplitude = amplitude
+    }
+
+    func setHarmonic4Amplitude(_ amplitude: Float) {
+        harmonic4Amplitude = amplitude
+    }
+
+    // Transient controls
+    func setTransientFrequency(_ frequency: Float) {
+        transientFrequency = frequency
+    }
+
+    func setTransientAmplitude(_ amplitude: Float) {
+        transientAmplitude = amplitude
+    }
+
+    func setTransientDecay(_ decay: Float) {
+        transientDecay = decay
+    }
+
+    // Envelope controls
+    func setPingEnvelopeDecay(_ decay: Float) {
+        pingEnvelopeDecay = decay
+    }
+
+    func setEchoEnvelopeDecay(_ decay: Float) {
+        echoEnvelopeDecay = decay
+    }
+
+    func setFrequencySweepAmount(_ amount: Float) {
+        frequencySweepAmount = amount
+    }
+
     func regenerateTone() {
         let wasPlaying = isPlaying
         if wasPlaying {
             stopPlayingTone()
         }
-        
+
         generateAudioBuffer()
-        
+
         if wasPlaying {
             startPlayingTone()
         }

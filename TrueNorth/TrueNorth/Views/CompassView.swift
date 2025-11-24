@@ -95,7 +95,7 @@ struct CompassView: View {
     @Binding var volume: Float
     let onVolumeChange: (Float) -> Void
 
-    private let compassSize: CGFloat = 250
+    private let compassSize: CGFloat = 300
     private let alignmentThreshold: Double = 5.0  // Degrees tolerance for alignment
 
     // Track cumulative rotation to avoid 360° wraparound issues
@@ -113,21 +113,24 @@ struct CompassView: View {
             // Rotating compass rose - rotates based on DEVICE heading only (not head rotation)
             // This shows where your phone/body is pointing relative to north
             ZStack {
-                // Traditional 8-pointed compass rose pattern (subtle background)
+                // Traditional 8-pointed compass rose pattern (more prominent)
                 TraditionalCompassRose()
-                    .fill(Color.primary.opacity(0.08))
+                    .fill(Color.primary.opacity(0.15))
                     .frame(width: compassSize - 20, height: compassSize - 20)
 
                 Circle()
                     .stroke(Color.gray.opacity(0.3), lineWidth: 2)
                     .frame(width: compassSize, height: compassSize)
 
+                // Draw ticks at different intervals
                 ForEach(0..<360, id: \.self) { degree in
-                    if degree % 10 == 0 {
+                    if degree % 5 == 0 {
                         Rectangle()
                             .fill(Color.primary)
-                            .frame(width: degree % 90 == 0 ? 3 : (degree % 30 == 0 ? 1.5 : 1),
-                                   height: degree % 90 == 0 ? 20 : (degree % 30 == 0 ? 12 : 8))
+                            .frame(
+                                width: degree % 90 == 0 ? 3 : (degree % 30 == 0 ? 1.5 : (degree % 10 == 0 ? 1 : 0.8)),
+                                height: degree % 90 == 0 ? 20 : (degree % 30 == 0 ? 12 : (degree % 10 == 0 ? 8 : 5))
+                            )
                             .offset(y: -compassSize / 2 + 10)
                             .rotationEffect(.degrees(Double(degree)))
                     }
@@ -173,34 +176,20 @@ struct CompassView: View {
 
             // Fixed heading indicator (red) - shows which way you're facing - centered
             TriangularArrow()
-                .fill(Color.red.opacity(0.7))  // Red arrow
+                .fill(Color.red.opacity(0.8))  // Red arrow
                 .frame(width: 50, height: 60)
+                .blendMode(.normal)
 
             // Head tracking arrow (blue) - shows head direction relative to device
             // Only visible when head tracking is active
-            // When aligned with red, creates purple overlay
+            // When aligned with red, creates purple overlay using multiply blend mode
             if isHeadTrackingActive {
                 TriangularArrow()
-                    .fill(Color.blue.opacity(0.6))  // Blue arrow - overlays red to make purple when aligned
+                    .fill(Color.blue.opacity(0.7))  // Blue arrow - uses screen blend mode for better mixing
                     .frame(width: 50, height: 60)
+                    .blendMode(.screen)  // Screen blend mode creates better color mixing
                     .rotationEffect(.degrees(-headOffset))  // Negated to fix inversion
                     .animation(.easeInOut(duration: 0.2), value: headOffset)
-            }
-
-            // Warning when AirPods not connected
-            if !isHeadTrackingActive {
-                VStack(spacing: 4) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(.orange)
-                    Text("No AirPods")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.orange)
-                }
-                .padding(8)
-                .background(Color.orange.opacity(0.1))
-                .cornerRadius(8)
-                .offset(x: -compassSize / 2 + 35, y: -compassSize / 2 + 35)
             }
         }
         .frame(width: compassSize + 60, height: compassSize + 100)

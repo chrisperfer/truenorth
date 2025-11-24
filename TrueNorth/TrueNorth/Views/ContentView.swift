@@ -9,8 +9,24 @@ struct ContentView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 30) {
-                VStack(spacing: 20) {
+            VStack(spacing: 15) {
+                VStack(spacing: 10) {
+                    // Warning when AirPods not connected - horizontally centered above compass
+                    if !orientationManager.isHeadTrackingActive {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(.orange)
+                            Text("No AirPods Connected")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.orange)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+
                     CompassView(
                         heading: orientationManager.combinedHeading,
                         isHeadTrackingActive: orientationManager.isHeadTrackingActive,
@@ -64,9 +80,9 @@ struct ContentView: View {
                         }
                     }
                 }
-                .padding()
+                .padding(.horizontal, 10)
 
-                VStack(spacing: 20) {
+                VStack(spacing: 15) {
                     // Tone controls list
                     VStack(spacing: 0) {
                         // North tone
@@ -92,7 +108,7 @@ struct ContentView: View {
                     }
                     .padding(.horizontal)
                 }
-                
+
                 if orientationManager.calibrationNeeded {
                     HStack {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -103,11 +119,10 @@ struct ContentView: View {
                     }
                     .padding(.horizontal)
                 }
-                
+
                 Spacer()
             }
-            .navigationTitle("TrueNorth")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingSettings = true }) {
@@ -157,16 +172,32 @@ struct SettingsView: View {
     @State private var occlusion: Float = 0.0
 
     // Tone parameters
-    @State private var frequency: Float = 607.27
+    @State private var frequency: Float = 830.0
     @State private var pingDuration: Float = 0.15
-    @State private var pingInterval: Float = 20.0
-    @State private var echoDelay: Float = 20.0
+    @State private var pingInterval: Float = 5.0
+    @State private var echoDelay: Float = 5.0
     @State private var echoAttenuation: Float = 0.28
 
     // Distance attenuation
     @State private var maxDistance: Float = 282.88
     @State private var referenceDistance: Float = 1.08
     @State private var rolloffFactor: Float = 0.70
+
+    // Harmonic amplitudes
+    @State private var fundamentalAmplitude: Float = 1.0
+    @State private var harmonic2Amplitude: Float = 1.0
+    @State private var harmonic3Amplitude: Float = 1.0
+    @State private var harmonic4Amplitude: Float = 1.0
+
+    // Transient parameters
+    @State private var transientFrequency: Float = 3000.0
+    @State private var transientAmplitude: Float = 0.3
+    @State private var transientDecay: Float = 50.0
+
+    // Envelope parameters
+    @State private var pingEnvelopeDecay: Float = 3.0
+    @State private var echoEnvelopeDecay: Float = 4.0
+    @State private var frequencySweepAmount: Float = 0.4
     
     var body: some View {
         NavigationView {
@@ -271,31 +302,26 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 20) {
                             Text("Tone Parameters")
                                 .font(.headline)
-                            
+
                             SliderControl(label: "Frequency (Hz)", value: $frequency, range: 200...4000) { _ in
                                 audioEngine.setToneFrequency(frequency)
                             }
-                            
+
                             SliderControl(label: "Ping Duration (s)", value: $pingDuration, range: 0.05...0.5) { _ in
                                 audioEngine.setPingDuration(pingDuration)
                             }
-                            
-                            SliderControl(label: "Ping Interval (s)", value: $pingInterval, range: 0.5...90) { _ in
+
+                            SliderControl(label: "Ping Interval (s)", value: $pingInterval, range: 0.5...120) { _ in
                                 audioEngine.setPingInterval(pingInterval)
                             }
 
-                            SliderControl(label: "Echo Delay (s)", value: $echoDelay, range: 0.1...90) { _ in
+                            SliderControl(label: "Echo Delay (s)", value: $echoDelay, range: 0.1...120) { _ in
                                 audioEngine.setEchoDelay(echoDelay)
                             }
-                            
+
                             SliderControl(label: "Echo Attenuation", value: $echoAttenuation, range: 0...1) { _ in
                                 audioEngine.setEchoAttenuation(echoAttenuation)
                             }
-                            
-                            Button("Regenerate Tone") {
-                                audioEngine.regenerateTone()
-                            }
-                            .buttonStyle(.borderedProminent)
                         }
                         .padding()
                         .background(Color.gray.opacity(0.1))
@@ -305,7 +331,7 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 20) {
                             Text("Distance Attenuation")
                                 .font(.headline)
-                            
+
                             SliderControl(label: "Max Distance", value: $maxDistance, range: 10...500) { _ in
                                 audioEngine.setDistanceAttenuation(
                                     maxDistance: maxDistance,
@@ -313,7 +339,7 @@ struct SettingsView: View {
                                     rolloffFactor: rolloffFactor
                                 )
                             }
-                            
+
                             SliderControl(label: "Reference Distance", value: $referenceDistance, range: 0.1...10) { _ in
                                 audioEngine.setDistanceAttenuation(
                                     maxDistance: maxDistance,
@@ -321,13 +347,80 @@ struct SettingsView: View {
                                     rolloffFactor: rolloffFactor
                                 )
                             }
-                            
+
                             SliderControl(label: "Rolloff Factor", value: $rolloffFactor, range: 0...5) { _ in
                                 audioEngine.setDistanceAttenuation(
                                     maxDistance: maxDistance,
                                     referenceDistance: referenceDistance,
                                     rolloffFactor: rolloffFactor
                                 )
+                            }
+                        }
+                        .padding()
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(10)
+
+                        // Harmonic & Spectral Controls Section
+                        VStack(alignment: .leading, spacing: 20) {
+                            Text("Harmonic Amplitudes")
+                                .font(.headline)
+
+                            SliderControl(label: "Fundamental", value: $fundamentalAmplitude, range: 0...1) { _ in
+                                audioEngine.setFundamentalAmplitude(fundamentalAmplitude)
+                            }
+
+                            SliderControl(label: "2nd Harmonic (Octave)", value: $harmonic2Amplitude, range: 0...1) { _ in
+                                audioEngine.setHarmonic2Amplitude(harmonic2Amplitude)
+                            }
+
+                            SliderControl(label: "3rd Harmonic", value: $harmonic3Amplitude, range: 0...1) { _ in
+                                audioEngine.setHarmonic3Amplitude(harmonic3Amplitude)
+                            }
+
+                            SliderControl(label: "4th Harmonic", value: $harmonic4Amplitude, range: 0...1) { _ in
+                                audioEngine.setHarmonic4Amplitude(harmonic4Amplitude)
+                            }
+                        }
+                        .padding()
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(10)
+
+                        // Transient Click Controls Section
+                        VStack(alignment: .leading, spacing: 20) {
+                            Text("Transient Click (Localization)")
+                                .font(.headline)
+
+                            SliderControl(label: "Frequency (Hz)", value: $transientFrequency, range: 1000...8000) { _ in
+                                audioEngine.setTransientFrequency(transientFrequency)
+                            }
+
+                            SliderControl(label: "Amplitude", value: $transientAmplitude, range: 0...1) { _ in
+                                audioEngine.setTransientAmplitude(transientAmplitude)
+                            }
+
+                            SliderControl(label: "Decay Rate", value: $transientDecay, range: 10...200) { _ in
+                                audioEngine.setTransientDecay(transientDecay)
+                            }
+                        }
+                        .padding()
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(10)
+
+                        // Envelope & Sweep Controls Section
+                        VStack(alignment: .leading, spacing: 20) {
+                            Text("Envelope & Frequency Sweep")
+                                .font(.headline)
+
+                            SliderControl(label: "Ping Envelope Decay", value: $pingEnvelopeDecay, range: 1...10) { _ in
+                                audioEngine.setPingEnvelopeDecay(pingEnvelopeDecay)
+                            }
+
+                            SliderControl(label: "Echo Envelope Decay", value: $echoEnvelopeDecay, range: 1...10) { _ in
+                                audioEngine.setEchoEnvelopeDecay(echoEnvelopeDecay)
+                            }
+
+                            SliderControl(label: "Frequency Sweep %", value: $frequencySweepAmount, range: 0...0.5) { _ in
+                                audioEngine.setFrequencySweepAmount(frequencySweepAmount)
                             }
                         }
                         .padding()
@@ -388,6 +481,12 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Regenerate") {
+                        audioEngine.regenerateTone()
+                    }
+                }
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
