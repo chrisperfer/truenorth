@@ -1,5 +1,6 @@
 import AVFoundation
 import Combine
+import CoreLocation
 
 class SpatialAudioEngine: ObservableObject {
     @Published var isPlaying: Bool = false
@@ -491,6 +492,88 @@ class SpatialAudioEngine: ObservableObject {
         audioBuffers.removeValue(forKey: id)
 
         print("Removed player node for \(id)")
+    }
+
+    func updateLocations(_ locations: [Location], toneProfileStore: ToneProfileStore) {
+        // Get IDs of enabled locations
+        let enabledIds = Set(locations.filter { $0.isEnabled }.map { $0.id })
+
+        // Remove nodes for disabled/deleted locations
+        let currentIds = Set(playerNodes.keys).subtracting([northId])
+        let toRemove = currentIds.subtracting(enabledIds)
+        toRemove.forEach { removePlayerNode(for: $0) }
+
+        // Add nodes for newly enabled locations
+        let toAdd = enabledIds.subtracting(currentIds)
+        for id in toAdd {
+            guard let location = locations.first(where: { $0.id == id }),
+                  let profile = toneProfileStore.profile(withId: location.toneProfileId),
+                  let node = createPlayerNode(for: id, profile: profile) else {
+                continue
+            }
+
+            // Start playback if engine is running
+            if audioEngine.isRunning && isPlaying {
+                node.play()
+            }
+        }
+    }
+
+    func updatePositions(
+        heading: Double,
+        userLocation: CLLocationCoordinate2D?,
+        locations: [Location]
+    ) {
+        guard audioEngine.isRunning else { return }
+
+        // Update north position (existing behavior)
+        updateNorthPosition(heading: heading)
+
+        // Update waypoint positions
+        guard let userLocation = userLocation else { return }
+
+        for location in locations where location.isEnabled {
+            guard let node = playerNodes[location.id] else { continue }
+
+            let bearing = BearingCalculator.calculateBearing(
+                from: userLocation,
+                to: location.coordinate
+            )
+            let relativeBearing = BearingCalculator.relativeBearing(
+                userHeading: heading,
+                destinationBearing: bearing
+            )
+
+            let position = calculateAudioPosition(relativeBearing: relativeBearing)
+            node.position = position
+        }
+    }
+
+    private func updateNorthPosition(heading: Double) {
+        let angleRadians = Float(heading * .pi / 180)
+        let distance: Float = 4.0
+        let northX = -sin(angleRadians) * distance
+        let northZ = -cos(angleRadians) * distance
+        let elevationFactor: Float = 1.5
+        let northY = cos(angleRadians) * elevationFactor
+
+        if let northNode = playerNodes[northId] {
+            northNode.position = AVAudio3DPoint(x: northX, y: northY, z: northZ)
+        } else {
+            // Fallback to original playerNode for backward compatibility
+            playerNode.position = AVAudio3DPoint(x: northX, y: northY, z: northZ)
+        }
+    }
+
+    private func calculateAudioPosition(relativeBearing: Double) -> AVAudio3DPoint {
+        let angleRadians = Float(relativeBearing * .pi / 180)
+        let distance: Float = 4.0
+        let x = sin(angleRadians) * distance
+        let z = -cos(angleRadians) * distance
+        let elevationFactor: Float = 1.5
+        let y = cos(angleRadians) * elevationFactor
+
+        return AVAudio3DPoint(x: x, y: y, z: z)
     }
 
     deinit {
