@@ -444,7 +444,55 @@ class SpatialAudioEngine: ObservableObject {
             startPlayingTone()
         }
     }
-    
+
+    // MARK: - Multi-Source Management
+
+    private func createPlayerNode(for id: UUID, profile: ToneProfile) -> AVAudioPlayerNode? {
+        let node = AVAudioPlayerNode()
+
+        // Generate buffer for this profile
+        guard let buffer = generateAudioBuffer(for: profile) else {
+            print("Failed to generate buffer for \(id)")
+            return nil
+        }
+
+        // Attach and connect node
+        audioEngine.attach(node)
+
+        let monoFormat = AVAudioFormat(
+            standardFormatWithSampleRate: audioEngine.outputNode.outputFormat(forBus: 0).sampleRate,
+            channels: 1
+        )!
+
+        audioEngine.connect(node, to: environmentNode, format: monoFormat)
+
+        // Configure node
+        node.position = AVAudio3DPoint(x: 0, y: 0, z: -4)
+        node.renderingAlgorithm = .HRTFHQ
+        node.volume = volume
+
+        // Schedule looping playback
+        node.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
+
+        // Store
+        playerNodes[id] = node
+        audioBuffers[id] = buffer
+
+        print("Created player node for \(id)")
+        return node
+    }
+
+    private func removePlayerNode(for id: UUID) {
+        guard let node = playerNodes[id] else { return }
+
+        node.stop()
+        audioEngine.detach(node)
+        playerNodes.removeValue(forKey: id)
+        audioBuffers.removeValue(forKey: id)
+
+        print("Removed player node for \(id)")
+    }
+
     deinit {
         audioEngine.stop()
     }
