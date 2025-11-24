@@ -333,12 +333,28 @@ class SpatialAudioEngine: ObservableObject {
         print("Scheduling buffer...")
         playerNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
         playerNode.play()
+
+        // Start all multi-source player nodes
+        for (id, node) in playerNodes {
+            if !node.isPlaying {
+                node.play()
+                print("Started player node for \(id)")
+            }
+        }
+
         isPlaying = true
         print("Playback started with position: (\(sourceX), \(sourceY), \(sourceZ))")
     }
     
     func stopPlayingTone() {
         playerNode.stop()
+
+        // Stop all multi-source player nodes
+        for (id, node) in playerNodes {
+            node.stop()
+            print("Stopped player node for \(id)")
+        }
+
         isPlaying = false
     }
     
