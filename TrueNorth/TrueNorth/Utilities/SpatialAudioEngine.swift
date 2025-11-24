@@ -141,97 +141,97 @@ class SpatialAudioEngine: ObservableObject {
         print("Player rendering algorithm: \(playerNode.renderingAlgorithm)")
     }
     
-    private func generateAudioBuffer() {
+    private func generateAudioBuffer(for profile: ToneProfile) -> AVAudioPCMBuffer? {
         let sampleRate: Double = 44100
-        // Use pingInterval as buffer duration (minimum 2 seconds for responsiveness)
-        let duration: TimeInterval = max(Double(pingInterval), 2.0)
+        let duration: TimeInterval = max(Double(profile.pingInterval), 2.0)
         let frameCount = AVAudioFrameCount(sampleRate * duration)
 
-        // Create mono buffer for spatial audio source
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!, frameCapacity: frameCount) else {
+        guard let buffer = AVAudioPCMBuffer(
+            pcmFormat: AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!,
+            frameCapacity: frameCount
+        ) else {
             print("Failed to create audio buffer")
-            return
+            return nil
         }
 
         buffer.frameLength = frameCount
 
-        // Submarine ping parameters (use class properties)
-        let pingFrequency: Double = Double(toneFrequency)  // Use configurable frequency
-        let pingDuration: Double = Double(self.pingDuration)
-        let pingInterval: Double = Double(self.pingInterval)
-        let echoDelay: Double = Double(self.echoDelay)
-        let echoAttenuation: Float = self.echoAttenuation
-
-        // Fill mono channel
         guard let channelData = buffer.floatChannelData?[0] else {
             print("Failed to get channel data")
-            return
+            return nil
         }
 
         for frame in 0..<Int(frameCount) {
             let time = Double(frame) / sampleRate
             var sample: Float = 0
 
-            // Calculate position within the ping interval
-            let cycleTime = time.truncatingRemainder(dividingBy: pingInterval)
+            let cycleTime = time.truncatingRemainder(dividingBy: Double(profile.pingInterval))
 
-            // Main ping with harmonics for better spatial localization
-            if cycleTime < pingDuration {
-                let pingTime = cycleTime / pingDuration
-                // Exponential envelope for more natural ping sound
-                let envelope = Float(exp(-Double(self.pingEnvelopeDecay) * pingTime))
-                // Frequency sweep for the fundamental
-                let frequency = pingFrequency * (1.0 - Double(self.frequencySweepAmount) * pingTime)
+            // Main ping with harmonics
+            if cycleTime < Double(profile.pingDuration) {
+                let pingTime = cycleTime / Double(profile.pingDuration)
+                let envelope = Float(exp(-Double(profile.pingEnvelopeDecay) * pingTime))
+                let frequency = Double(profile.frequency) * (1.0 - Double(profile.frequencySweepAmount) * pingTime)
 
-                // Fundamental frequency
-                let fundamental = sin(Float(2.0 * .pi * frequency * cycleTime)) * envelope * self.fundamentalAmplitude
+                let fundamental = sin(Float(2.0 * .pi * frequency * cycleTime)) * envelope * profile.fundamentalAmplitude
+                let harmonic2 = sin(Float(2.0 * .pi * frequency * 2.0 * cycleTime)) * envelope * profile.harmonic2Amplitude
+                let harmonic3 = sin(Float(2.0 * .pi * frequency * 3.0 * cycleTime)) * envelope * profile.harmonic3Amplitude
+                let harmonic4 = sin(Float(2.0 * .pi * frequency * 4.0 * cycleTime)) * envelope * profile.harmonic4Amplitude
 
-                // Add harmonics for spectral richness (critical for HRTF filtering)
-                // 2nd harmonic (octave) - strong presence above 1.5 kHz threshold
-                let harmonic2 = sin(Float(2.0 * .pi * frequency * 2.0 * cycleTime)) * envelope * self.harmonic2Amplitude
+                let transientEnvelope = Float(exp(-Double(profile.transientDecay) * pingTime))
+                let transient = sin(Float(2.0 * .pi * Double(profile.transientFrequency) * cycleTime)) * transientEnvelope * profile.transientAmplitude
 
-                // 3rd harmonic - adds brightness
-                let harmonic3 = sin(Float(2.0 * .pi * frequency * 3.0 * cycleTime)) * envelope * self.harmonic3Amplitude
-
-                // 4th harmonic - high frequency content for pinna cues
-                let harmonic4 = sin(Float(2.0 * .pi * frequency * 4.0 * cycleTime)) * envelope * self.harmonic4Amplitude
-
-                // Brief high-frequency transient click at onset for localization
-                // Critical for HRTF to provide front/back differentiation
-                let transientEnvelope = Float(exp(-Double(self.transientDecay) * pingTime))  // Very fast decay
-                let transient = sin(Float(2.0 * .pi * Double(self.transientFrequency) * cycleTime)) * transientEnvelope * self.transientAmplitude
-
-                // Mix all components
                 sample = fundamental + harmonic2 + harmonic3 + harmonic4 + transient
-
-                // Normalize to prevent clipping
-                sample *= 1.0  // Amplitudes already balanced above
             }
 
-            // Echo with harmonics
-            let echoStart = echoDelay
-            let echoEnd = echoDelay + pingDuration
+            // Echo
+            let echoStart = Double(profile.echoDelay)
+            let echoEnd = echoStart + Double(profile.pingDuration)
             if cycleTime >= echoStart && cycleTime < echoEnd {
-                let echoTime = (cycleTime - echoStart) / pingDuration
-                let envelope = Float(exp(-Double(self.echoEnvelopeDecay) * echoTime)) * echoAttenuation
-                let frequency = pingFrequency * 0.9 * (1.0 - Double(self.frequencySweepAmount) * 1.5 * echoTime)
+                let echoTime = (cycleTime - echoStart) / Double(profile.pingDuration)
+                let envelope = Float(exp(-Double(profile.echoEnvelopeDecay) * echoTime)) * profile.echoAttenuation
+                let frequency = Double(profile.frequency) * 0.9 * (1.0 - Double(profile.frequencySweepAmount) * 1.5 * echoTime)
 
-                // Echo also has harmonics but attenuated
-                let fundamental = sin(Float(2.0 * .pi * frequency * (cycleTime - echoStart))) * envelope * self.fundamentalAmplitude
-                let harmonic2 = sin(Float(2.0 * .pi * frequency * 2.0 * (cycleTime - echoStart))) * envelope * self.harmonic2Amplitude * 0.75
-                let harmonic3 = sin(Float(2.0 * .pi * frequency * 3.0 * (cycleTime - echoStart))) * envelope * self.harmonic3Amplitude * 0.6
+                let fundamental = sin(Float(2.0 * .pi * frequency * (cycleTime - echoStart))) * envelope * profile.fundamentalAmplitude
+                let harmonic2 = sin(Float(2.0 * .pi * frequency * 2.0 * (cycleTime - echoStart))) * envelope * profile.harmonic2Amplitude * 0.75
+                let harmonic3 = sin(Float(2.0 * .pi * frequency * 3.0 * (cycleTime - echoStart))) * envelope * profile.harmonic3Amplitude * 0.6
 
                 sample += fundamental + harmonic2 + harmonic3
             }
 
-            // Apply soft clipping to prevent harsh distortion
             sample = tanh(sample)
-
             channelData[frame] = sample
         }
 
-        audioBuffer = buffer
-        print("Audio buffer generated: Enhanced spatial ping with harmonics (fundamental: \(Int(pingFrequency))Hz, harmonics up to \(Int(pingFrequency * 4))Hz)")
+        return buffer
+    }
+
+    private func generateAudioBuffer() {
+        // Create default tone profile from current instance properties
+        let profile = ToneProfile(
+            name: "Default",
+            frequency: toneFrequency,
+            pingDuration: pingDuration,
+            pingInterval: pingInterval,
+            echoDelay: echoDelay,
+            echoAttenuation: echoAttenuation,
+            fundamentalAmplitude: fundamentalAmplitude,
+            harmonic2Amplitude: harmonic2Amplitude,
+            harmonic3Amplitude: harmonic3Amplitude,
+            harmonic4Amplitude: harmonic4Amplitude,
+            transientFrequency: transientFrequency,
+            transientAmplitude: transientAmplitude,
+            transientDecay: transientDecay,
+            pingEnvelopeDecay: pingEnvelopeDecay,
+            echoEnvelopeDecay: echoEnvelopeDecay,
+            frequencySweepAmount: frequencySweepAmount
+        )
+
+        audioBuffer = generateAudioBuffer(for: profile)
+
+        if audioBuffer != nil {
+            print("Audio buffer generated: Enhanced spatial ping")
+        }
     }
     
     func updateSourcePosition(x: Float, y: Float, z: Float) {
