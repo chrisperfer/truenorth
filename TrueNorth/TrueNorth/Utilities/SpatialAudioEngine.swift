@@ -59,8 +59,9 @@ class SpatialAudioEngine: ObservableObject {
             self?.generateAudioBuffer()
         }
 
-        // Set initial position
-        updateSourcePosition(x: sourceX, y: sourceY, z: sourceZ)
+        // Initialize north as the default source
+        let defaultProfile = ToneProfileStore().defaultProfile
+        _ = createPlayerNode(for: northId, profile: defaultProfile)
     }
     
     // Removed testBasicAudio() - it was causing slow startup by creating/starting/stopping
