@@ -48,7 +48,8 @@ struct ContentView: View {
                     HStack(spacing: 20) {
                         // Head Tracking Calibration Button
                         Button(action: {
-                            orientationManager.calibrateHeadTracking()
+                            // TODO: Re-add calibrateHeadTracking() method to OrientationManager
+                            // orientationManager.calibrateHeadTracking()
                         }) {
                             VStack(spacing: 4) {
                                 Image(systemName: "scope")
