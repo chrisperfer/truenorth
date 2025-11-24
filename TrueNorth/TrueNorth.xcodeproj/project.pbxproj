@@ -17,6 +17,7 @@
 		A1A1A1A82B1111110000002 /* ToneProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000009 /* ToneProfile.swift */; };
 		A1A1A1A92B1111110000002 /* Location.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000010 /* Location.swift */; };
 		A1A1A1AA2B1111110000003 /* ToneProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000011 /* ToneProfileStore.swift */; };
+		A1A1A1AB2B1111110000003 /* LocationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000012 /* LocationStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +33,7 @@
 		A1A1A1A02B1111110000009 /* ToneProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToneProfile.swift; sourceTree = "<group>"; };
 		A1A1A1A02B1111110000010 /* Location.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Location.swift; sourceTree = "<group>"; };
 		A1A1A1A02B1111110000011 /* ToneProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToneProfileStore.swift; sourceTree = "<group>"; };
+		A1A1A1A02B1111110000012 /* LocationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -106,6 +108,7 @@
 			isa = PBXGroup;
 			children = (
 				A1A1A1A02B1111110000011 /* ToneProfileStore.swift */,
+				A1A1A1A02B1111110000012 /* LocationStore.swift */,
 			);
 			path = Stores;
 			sourceTree = "<group>";
@@ -205,6 +208,7 @@
 				A1A1A1A82B1111110000002 /* ToneProfile.swift in Sources */,
 				A1A1A1A92B1111110000002 /* Location.swift in Sources */,
 				A1A1A1AA2B1111110000003 /* ToneProfileStore.swift in Sources */,
+				A1A1A1AB2B1111110000003 /* LocationStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
