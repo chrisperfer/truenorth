@@ -1,0 +1,23 @@
+# Worktrees
+.worktrees/
+
+# Xcode
+*.xcuserstate
+*.xcuserdatad
+xcuserdata/
+build/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+DerivedData/
+*.hmap
+*.ipa
+
+# macOS
+.DS_Store
+
+# Temporary files
+*.swp
+*.swo
+*~
