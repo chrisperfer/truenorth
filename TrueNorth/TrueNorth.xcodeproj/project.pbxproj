@@ -16,6 +16,7 @@
 		A1A1A1A72B1111110000001 /* SimpleToneGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000008 /* SimpleToneGenerator.swift */; };
 		A1A1A1A82B1111110000002 /* ToneProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000009 /* ToneProfile.swift */; };
 		A1A1A1A92B1111110000002 /* Location.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000010 /* Location.swift */; };
+		A1A1A1AA2B1111110000003 /* ToneProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000011 /* ToneProfileStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +31,7 @@
 		A1A1A1A02B1111110000008 /* SimpleToneGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleToneGenerator.swift; sourceTree = "<group>"; };
 		A1A1A1A02B1111110000009 /* ToneProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToneProfile.swift; sourceTree = "<group>"; };
 		A1A1A1A02B1111110000010 /* Location.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Location.swift; sourceTree = "<group>"; };
+		A1A1A1A02B1111110000011 /* ToneProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToneProfileStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +61,7 @@
 				A1A1A1AB2B1111110000000 /* Views */,
 				A1A1A1AC2B1111110000000 /* ViewModels */,
 				A1A1A1AD2B1111110000000 /* Models */,
+				A1A1A1B02B1111110000001 /* Stores */,
 				A1A1A1AE2B1111110000000 /* Utilities */,
 				A1A1A1AF2B1111110000000 /* Resources */,
 			);
@@ -97,6 +100,14 @@
 				A1A1A1A02B1111110000010 /* Location.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		A1A1A1B02B1111110000001 /* Stores */ = {
+			isa = PBXGroup;
+			children = (
+				A1A1A1A02B1111110000011 /* ToneProfileStore.swift */,
+			);
+			path = Stores;
 			sourceTree = "<group>";
 		};
 		A1A1A1AE2B1111110000000 /* Utilities */ = {
@@ -193,6 +204,7 @@
 				A1A1A1A72B1111110000001 /* SimpleToneGenerator.swift in Sources */,
 				A1A1A1A82B1111110000002 /* ToneProfile.swift in Sources */,
 				A1A1A1A92B1111110000002 /* Location.swift in Sources */,
+				A1A1A1AA2B1111110000003 /* ToneProfileStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
