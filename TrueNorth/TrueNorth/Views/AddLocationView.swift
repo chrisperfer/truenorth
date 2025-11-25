@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import UIKit
 
 struct AddLocationView: View {
     @Environment(\.dismiss) private var dismiss
@@ -96,6 +97,7 @@ struct AddLocationView: View {
             await MainActor.run {
                 switch result {
                 case .success(let coordinate):
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
                     searchResult = coordinate
                     if locationName.isEmpty {
                         locationName = searchAddress.components(separatedBy: ",").first ?? searchAddress
