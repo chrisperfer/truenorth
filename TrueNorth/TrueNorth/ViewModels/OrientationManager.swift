@@ -23,7 +23,7 @@ class OrientationManager: NSObject, ObservableObject {
     private let smoothingFactor: Double = 0.4  // Faster response while maintaining smoothness
     private var previousHeading: Double = 0
     private var previousDeviceHeading: Double = 0
-    
+
     // Pocket mode variables
     private var lockedNorthReference: Double = 0
     private var initialHeadOrientation: CMAttitude?
@@ -31,7 +31,13 @@ class OrientationManager: NSObject, ObservableObject {
     private var headingStabilityCount: Int = 0
     private let stabilityThreshold: Double = 5.0 // degrees
     private let stabilityCountRequired: Int = 5
-    
+
+    // Location and tone profile stores
+    private var locationStore: LocationStore?
+    private var toneProfileStore: ToneProfileStore?
+    private var locationCancellable: AnyCancellable?
+    private var audioEngine: SpatialAudioEngine?
+
     override init() {
         super.init()
         setupLocationManager()
@@ -59,7 +65,22 @@ class OrientationManager: NSObject, ObservableObject {
         }
         print("Pocket mode: \(isPocketMode ? "ON" : "OFF")")
     }
-    
+
+    func setupLocationUpdates(locationStore: LocationStore, toneProfileStore: ToneProfileStore, audioEngine: SpatialAudioEngine) {
+        self.locationStore = locationStore
+        self.toneProfileStore = toneProfileStore
+        self.audioEngine = audioEngine
+
+        // Subscribe to location changes
+        locationCancellable = locationStore.$locations
+            .sink { [weak self] locations in
+                guard let self = self,
+                      let audioEngine = self.audioEngine,
+                      let toneProfileStore = self.toneProfileStore else { return }
+                audioEngine.updateLocations(locations, toneProfileStore: toneProfileStore)
+            }
+    }
+
     private func lockNorthReference() {
         lockedNorthReference = deviceHeading
         initialHeadOrientation = headRotation

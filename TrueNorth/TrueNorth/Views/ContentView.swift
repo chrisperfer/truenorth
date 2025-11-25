@@ -5,8 +5,10 @@ import AVFoundation
 struct ContentView: View {
     @StateObject private var orientationManager = OrientationManager()
     @StateObject private var audioEngine = SpatialAudioEngine()
+    @EnvironmentObject var locationStore: LocationStore
+    @EnvironmentObject var toneProfileStore: ToneProfileStore
     @State private var showingSettings = false
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 15) {
@@ -134,13 +136,22 @@ struct ContentView: View {
         }
         .onAppear {
             orientationManager.start()
+            orientationManager.setupLocationUpdates(
+                locationStore: locationStore,
+                toneProfileStore: toneProfileStore,
+                audioEngine: audioEngine
+            )
         }
         .onDisappear {
             orientationManager.stop()
             audioEngine.stopPlayingTone()
         }
         .onReceive(orientationManager.$combinedHeading.throttle(for: .milliseconds(16), scheduler: DispatchQueue.main, latest: true)) { newHeading in
-            audioEngine.updateOrientation(heading: newHeading)
+            audioEngine.updatePositions(
+                heading: newHeading,
+                userLocation: orientationManager.userLocation,
+                locations: []  // Will be updated via setupLocationUpdates
+            )
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView(audioEngine: audioEngine)
