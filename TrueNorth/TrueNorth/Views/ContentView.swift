@@ -150,7 +150,7 @@ struct ContentView: View {
             audioEngine.updatePositions(
                 heading: newHeading,
                 userLocation: orientationManager.userLocation,
-                locations: []  // Will be updated via setupLocationUpdates
+                locations: locationStore.locations
             )
         }
         .sheet(isPresented: $showingSettings) {
