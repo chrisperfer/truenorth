@@ -286,11 +286,12 @@ class SpatialAudioEngine: ObservableObject {
     }
     
     func startPlayingTone() {
-        guard let buffer = audioBuffer else {
-            print("No audio buffer available")
+        // Check if we have audio sources available (multi-source or legacy)
+        guard !playerNodes.isEmpty || audioBuffer != nil else {
+            print("No audio sources available")
             return
         }
-        
+
         guard !isPlaying else {
             print("Already playing")
             return
@@ -330,11 +331,9 @@ class SpatialAudioEngine: ObservableObject {
         playerNode.position = AVAudio3DPoint(x: sourceX, y: sourceY, z: sourceZ)
         playerNode.reverbBlend = min(1.0, sqrt(sourceX*sourceX + sourceY*sourceY + sourceZ*sourceZ) / 50.0)
         
-        print("Scheduling buffer...")
-        playerNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
-        playerNode.play()
-
-        // Start all multi-source player nodes
+        // Start all multi-source player nodes (including north)
+        // Note: We use the multi-source system exclusively now - the original playerNode
+        // is kept for backward compatibility but not used when playerNodes has entries
         for (id, node) in playerNodes {
             if !node.isPlaying {
                 node.play()
@@ -342,8 +341,16 @@ class SpatialAudioEngine: ObservableObject {
             }
         }
 
+        // Fallback: if no multi-source nodes exist, use the original playerNode
+        if playerNodes.isEmpty, let buffer = audioBuffer {
+            print("Scheduling buffer on legacy playerNode...")
+            playerNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
+            playerNode.play()
+            print("Playback started with position: (\(sourceX), \(sourceY), \(sourceZ))")
+        }
+
         isPlaying = true
-        print("Playback started with position: (\(sourceX), \(sourceY), \(sourceZ))")
+        print("Playback started with \(playerNodes.count) audio sources")
     }
     
     func stopPlayingTone() {
@@ -518,19 +525,26 @@ class SpatialAudioEngine: ObservableObject {
         // Remove nodes for disabled/deleted locations
         let currentIds = Set(playerNodes.keys).subtracting([northId])
         let toRemove = currentIds.subtracting(enabledIds)
+
+        print("SpatialAudioEngine.updateLocations: enabledIds=\(enabledIds.count), currentIds=\(currentIds.count), toRemove=\(toRemove.count)")
+
         toRemove.forEach { removePlayerNode(for: $0) }
 
         // Add nodes for newly enabled locations
         let toAdd = enabledIds.subtracting(currentIds)
+        print("SpatialAudioEngine.updateLocations: toAdd=\(toAdd.count), isRunning=\(audioEngine.isRunning), isPlaying=\(isPlaying)")
+
         for id in toAdd {
             guard let location = locations.first(where: { $0.id == id }),
                   let profile = toneProfileStore.profile(withId: location.toneProfileId),
                   let node = createPlayerNode(for: id, profile: profile) else {
+                print("SpatialAudioEngine.updateLocations: failed to create node for \(id)")
                 continue
             }
 
             // Start playback if engine is running
             if audioEngine.isRunning && isPlaying {
+                print("SpatialAudioEngine.updateLocations: starting playback for \(id)")
                 node.play()
             }
         }
