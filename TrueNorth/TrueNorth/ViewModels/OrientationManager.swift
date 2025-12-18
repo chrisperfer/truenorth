@@ -66,6 +66,14 @@ class OrientationManager: NSObject, ObservableObject {
         print("Pocket mode: \(isPocketMode ? "ON" : "OFF")")
     }
 
+    func calibrateHeadTracking() {
+        // Reset head tracking reference to current position
+        if let attitude = headRotation {
+            initialHeadOrientation = attitude
+            print("Head tracking calibrated - current position is now 'forward'")
+        }
+    }
+
     func setupLocationUpdates(locationStore: LocationStore, toneProfileStore: ToneProfileStore, audioEngine: SpatialAudioEngine) {
         self.locationStore = locationStore
         self.toneProfileStore = toneProfileStore
@@ -76,9 +84,19 @@ class OrientationManager: NSObject, ObservableObject {
             .sink { [weak self] locations in
                 guard let self = self,
                       let audioEngine = self.audioEngine,
-                      let toneProfileStore = self.toneProfileStore else { return }
+                      let toneProfileStore = self.toneProfileStore else {
+                    print("OrientationManager: subscription guard failed")
+                    return
+                }
+                let enabledCount = locations.filter { $0.isEnabled }.count
+                print("OrientationManager: locations changed, \(locations.count) total, \(enabledCount) enabled")
                 audioEngine.updateLocations(locations, toneProfileStore: toneProfileStore)
             }
+
+        // Initialize audio nodes for already-loaded locations
+        let enabledCount = locationStore.locations.filter { $0.isEnabled }.count
+        print("OrientationManager: initial load, \(locationStore.locations.count) total, \(enabledCount) enabled")
+        audioEngine.updateLocations(locationStore.locations, toneProfileStore: toneProfileStore)
     }
 
     private func lockNorthReference() {
@@ -90,7 +108,11 @@ class OrientationManager: NSObject, ObservableObject {
     private func setupLocationManager() {
         locationManager.delegate = self
         locationManager.headingFilter = 1
-        locationManager.requestWhenInUseAuthorization()
+        // Request always authorization for background audio navigation
+        locationManager.requestAlwaysAuthorization()
+        // Enable background location updates
+        locationManager.allowsBackgroundLocationUpdates = true
+        locationManager.pausesLocationUpdatesAutomatically = false
     }
     
     private func setupHeadTracking() {

@@ -22,6 +22,9 @@
 		A1A1A1AD2B1111110000004 /* BearingCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000014 /* BearingCalculator.swift */; };
 		A1A1A1AE2B1111110000005 /* AddLocationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000015 /* AddLocationView.swift */; };
 		A1A1A1AF2B1111110000005 /* LocationRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000016 /* LocationRow.swift */; };
+		A1A1A1B02B1111110000006 /* ToneRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000017 /* ToneRow.swift */; };
+		A1A1A1B12B1111110000006 /* ToneEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000018 /* ToneEditorView.swift */; };
+		A1A1A1B22B1111110000007 /* LocationEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A02B1111110000019 /* LocationEditorView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +45,9 @@
 		A1A1A1A02B1111110000014 /* BearingCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BearingCalculator.swift; sourceTree = "<group>"; };
 		A1A1A1A02B1111110000015 /* AddLocationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddLocationView.swift; sourceTree = "<group>"; };
 		A1A1A1A02B1111110000016 /* LocationRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationRow.swift; sourceTree = "<group>"; };
+		A1A1A1A02B1111110000017 /* ToneRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToneRow.swift; sourceTree = "<group>"; };
+		A1A1A1A02B1111110000018 /* ToneEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToneEditorView.swift; sourceTree = "<group>"; };
+		A1A1A1A02B1111110000019 /* LocationEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationEditorView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -94,6 +100,9 @@
 				A1A1A1A02B1111110000005 /* CompassView.swift */,
 				A1A1A1A02B1111110000015 /* AddLocationView.swift */,
 				A1A1A1A02B1111110000016 /* LocationRow.swift */,
+				A1A1A1A02B1111110000017 /* ToneRow.swift */,
+				A1A1A1A02B1111110000018 /* ToneEditorView.swift */,
+				A1A1A1A02B1111110000019 /* LocationEditorView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -233,6 +242,9 @@
 				A1A1A1AD2B1111110000004 /* BearingCalculator.swift in Sources */,
 				A1A1A1AE2B1111110000005 /* AddLocationView.swift in Sources */,
 				A1A1A1AF2B1111110000005 /* LocationRow.swift in Sources */,
+				A1A1A1B02B1111110000006 /* ToneRow.swift in Sources */,
+				A1A1A1B12B1111110000006 /* ToneEditorView.swift in Sources */,
+				A1A1A1B22B1111110000007 /* LocationEditorView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

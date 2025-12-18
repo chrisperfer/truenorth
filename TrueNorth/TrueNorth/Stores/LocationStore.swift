@@ -55,6 +55,7 @@ class LocationStore: ObservableObject {
     func toggle(_ location: Location) {
         if let index = locations.firstIndex(where: { $0.id == location.id }) {
             locations[index].isEnabled.toggle()
+            print("LocationStore.toggle: \(location.name) isEnabled=\(locations[index].isEnabled)")
         }
     }
 }

@@ -1,18 +1,17 @@
 import SwiftUI
 
-struct LocationRow: View {
-    let location: Location
-    let profileName: String
+struct ToneRow: View {
+    let profile: ToneProfile
     let onEdit: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(location.name)
+                Text(profile.name)
                     .font(.headline)
 
-                Text(profileName)
+                Text("\(Int(profile.frequency)) Hz")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -35,13 +34,8 @@ struct LocationRow: View {
 }
 
 #Preview {
-    LocationRow(
-        location: Location(
-            name: "Home",
-            coordinate: .init(latitude: 37.7749, longitude: -122.4194),
-            toneProfileId: UUID()
-        ),
-        profileName: "Default Tone",
+    ToneRow(
+        profile: ToneProfile(name: "Test Tone", frequency: 440),
         onEdit: {},
         onDelete: {}
     )

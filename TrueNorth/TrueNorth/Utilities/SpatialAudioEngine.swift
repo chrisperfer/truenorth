@@ -4,7 +4,11 @@ import CoreLocation
 
 class SpatialAudioEngine: ObservableObject {
     @Published var isPlaying: Bool = false
-    @Published var volume: Float = 1.0  // Increased to match other audio sources
+    @Published var volume: Float {
+        didSet {
+            UserDefaults.standard.set(volume, forKey: "AudioVolume")
+        }
+    }
     
     // Position for sound source (now public for experimental view)
     // Optimized distance: 4m for better presence and spatial localization
@@ -51,6 +55,10 @@ class SpatialAudioEngine: ObservableObject {
     private let northId = UUID() // Static identifier for north direction
     
     init() {
+        // Load persisted volume (default to 1.0 if not set)
+        let savedVolume = UserDefaults.standard.object(forKey: "AudioVolume") as? Float ?? 1.0
+        self.volume = savedVolume
+
         setupAudioSession()
         setupAudioEngine()
 
@@ -368,6 +376,10 @@ class SpatialAudioEngine: ObservableObject {
     func setVolume(_ newVolume: Float) {
         volume = newVolume
         playerNode.volume = volume
+        // Also update all multi-source player nodes
+        for (_, node) in playerNodes {
+            node.volume = volume
+        }
     }
     
     // MARK: - Experimental Controls
@@ -532,21 +544,95 @@ class SpatialAudioEngine: ObservableObject {
 
         // Add nodes for newly enabled locations
         let toAdd = enabledIds.subtracting(currentIds)
-        print("SpatialAudioEngine.updateLocations: toAdd=\(toAdd.count), isRunning=\(audioEngine.isRunning), isPlaying=\(isPlaying)")
+        print("SpatialAudioEngine.updateLocations: toAdd=\(toAdd.count), isRunning=\(audioEngine.isRunning)")
 
         for id in toAdd {
-            guard let location = locations.first(where: { $0.id == id }),
-                  let profile = toneProfileStore.profile(withId: location.toneProfileId),
-                  let node = createPlayerNode(for: id, profile: profile) else {
+            guard let location = locations.first(where: { $0.id == id }) else {
+                print("SpatialAudioEngine.updateLocations: location not found for \(id)")
+                continue
+            }
+
+            // Use stored profile or fall back to default
+            let profile = toneProfileStore.profile(withId: location.toneProfileId) ?? toneProfileStore.defaultProfile
+
+            guard let node = createPlayerNode(for: id, profile: profile) else {
                 print("SpatialAudioEngine.updateLocations: failed to create node for \(id)")
                 continue
             }
 
-            // Start playback if engine is running
-            if audioEngine.isRunning && isPlaying {
+            // Start playback if engine is running - waypoints play independently of North
+            if audioEngine.isRunning {
+                // Ensure audio session is active
+                ensureAudioSessionActive()
                 print("SpatialAudioEngine.updateLocations: starting playback for \(id)")
                 node.play()
             }
+        }
+    }
+
+    /// Regenerate audio buffer for all waypoints using a specific tone profile
+    func regenerateProfile(_ profileId: UUID, profile: ToneProfile, locations: [Location]) {
+        print("Regenerating audio for profile: \(profile.name)")
+
+        // Find all locations using this profile
+        let affectedLocations = locations.filter { $0.toneProfileId == profileId && $0.isEnabled }
+
+        for location in affectedLocations {
+            guard let node = playerNodes[location.id] else { continue }
+
+            let wasPlaying = node.isPlaying
+            node.stop()
+
+            // Generate new buffer
+            guard let buffer = generateAudioBuffer(for: profile) else {
+                print("Failed to regenerate buffer for \(location.id)")
+                continue
+            }
+
+            // Update stored buffer
+            audioBuffers[location.id] = buffer
+
+            // Reschedule with new buffer
+            node.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
+
+            if wasPlaying || audioEngine.isRunning {
+                node.play()
+            }
+
+            print("Regenerated audio for waypoint: \(location.name)")
+        }
+
+        // Also regenerate North if it uses the default profile
+        if profileId == ToneProfileStore.defaultProfileId, let northNode = playerNodes[northId] {
+            let wasPlaying = northNode.isPlaying
+            northNode.stop()
+
+            if let buffer = generateAudioBuffer(for: profile) {
+                audioBuffers[northId] = buffer
+                northNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
+
+                if wasPlaying {
+                    northNode.play()
+                }
+                print("Regenerated North audio")
+            }
+        }
+    }
+
+    private func ensureAudioSessionActive() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers, .allowBluetoothA2DP, .allowAirPlay])
+            if #available(iOS 15.0, *) {
+                try session.setSupportsMultichannelContent(true)
+            }
+            try session.setActive(true)
+
+            if !audioEngine.isRunning {
+                try audioEngine.start()
+            }
+        } catch {
+            print("Failed to ensure audio session active: \(error)")
         }
     }
 
@@ -605,6 +691,66 @@ class SpatialAudioEngine: ObservableObject {
         let y = cos(angleRadians) * elevationFactor
 
         return AVAudio3DPoint(x: x, y: y, z: z)
+    }
+
+    // MARK: - Tone Preview
+
+    private var previewNode: AVAudioPlayerNode?
+    private var previewBuffer: AVAudioPCMBuffer?
+
+    func previewTone(profile: ToneProfile) {
+        // Stop any existing preview
+        stopPreview()
+
+        // Create preview node
+        let node = AVAudioPlayerNode()
+        audioEngine.attach(node)
+
+        // Connect with mono format for spatial audio
+        let outputFormat = audioEngine.outputNode.outputFormat(forBus: 0)
+        let monoFormat = AVAudioFormat(standardFormatWithSampleRate: outputFormat.sampleRate, channels: 1)!
+        audioEngine.connect(node, to: environmentNode, format: monoFormat)
+
+        // Position in front of listener
+        node.position = AVAudio3DPoint(x: 0, y: 0, z: -4)
+        node.renderingAlgorithm = .HRTFHQ
+        node.volume = volume
+
+        // Generate buffer for this profile
+        guard let buffer = generateAudioBuffer(for: profile) else {
+            print("Failed to generate preview buffer")
+            audioEngine.detach(node)
+            return
+        }
+
+        // Ensure engine is running
+        if !audioEngine.isRunning {
+            do {
+                try audioEngine.start()
+            } catch {
+                print("Failed to start audio engine for preview: \(error)")
+                audioEngine.detach(node)
+                return
+            }
+        }
+
+        // Schedule and play
+        node.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
+        node.play()
+
+        previewNode = node
+        previewBuffer = buffer
+        print("Preview started for tone: \(profile.name)")
+    }
+
+    func stopPreview() {
+        guard let node = previewNode else { return }
+
+        node.stop()
+        audioEngine.detach(node)
+        previewNode = nil
+        previewBuffer = nil
+        print("Preview stopped")
     }
 
     deinit {

@@ -6,5 +6,12 @@
 	<string>This app uses motion data to track your head orientation with AirPods Pro for spatial audio navigation</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app uses location to calculate true north for accurate directional audio</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app uses location in the background to provide continuous directional audio guidance to your waypoints</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>location</string>
+	</array>
 </dict>
 </plist>

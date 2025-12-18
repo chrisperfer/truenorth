@@ -92,8 +92,6 @@ struct CompassView: View {
     let deviceHeading: Double
     let smoothedDeviceHeading: Double
     let headOffset: Double
-    @Binding var volume: Float
-    let onVolumeChange: (Float) -> Void
 
     private let compassSize: CGFloat = 300
     private let alignmentThreshold: Double = 5.0  // Degrees tolerance for alignment
@@ -105,8 +103,6 @@ struct CompassView: View {
     @State private var hapticGenerator = UIImpactFeedbackGenerator(style: .heavy)
     @State private var tickHapticGenerator = UIImpactFeedbackGenerator(style: .light)
     @State private var lastCrossedTick: Int = -1
-    @State private var showBottomSheet: Bool = true
-    @State private var selectedDetent: PresentationDetent = .height(120)
 
     var body: some View {
         ZStack {
@@ -209,22 +205,6 @@ struct CompassView: View {
             hapticGenerator.prepare()
             tickHapticGenerator.prepare()
         }
-        .sheet(isPresented: $showBottomSheet) {
-            BottomSheetContent(
-                volume: $volume,
-                onVolumeChange: onVolumeChange,
-                heading: heading,
-                deviceHeading: deviceHeading,
-                headOffset: headOffset,
-                headingAccuracy: headingAccuracy,
-                isHeadTrackingActive: isHeadTrackingActive,
-                selectedDetent: $selectedDetent
-            )
-            .presentationDetents([.height(120), .height(200), .medium], selection: $selectedDetent)
-            .presentationBackgroundInteraction(.enabled)
-            .presentationDragIndicator(.visible)
-            .interactiveDismissDisabled()
-        }
     }
 
     private func degrees(for direction: String) -> Double {
@@ -249,31 +229,72 @@ struct BottomSheetContent: View {
     let isHeadTrackingActive: Bool
     @Binding var selectedDetent: PresentationDetent
 
-    var body: some View {
-        VStack(spacing: 16) {
-            // Volume control - always visible
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "speaker.wave.2")
-                        .foregroundColor(.secondary)
-                    Text("Volume")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("\(Int(volume * 100))%")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
+    // Waypoint data
+    let locations: [Location]
+    let isNorthPlaying: Bool
+    let onNorthToggle: (Bool) -> Void
+    let onLocationToggle: (Location) -> Void
 
-                Slider(value: $volume, in: 0...1) { _ in
-                    onVolumeChange(volume)
+    var body: some View {
+        VStack(spacing: 12) {
+            // Waypoints section - always visible
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Waypoints")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 20)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        // North toggle
+                        WaypointChip(
+                            name: "North",
+                            icon: "location.north.fill",
+                            isEnabled: isNorthPlaying,
+                            tint: .blue
+                        ) {
+                            onNorthToggle(!isNorthPlaying)
+                        }
+
+                        // Custom locations
+                        ForEach(locations) { location in
+                            WaypointChip(
+                                name: location.name,
+                                icon: "mappin.circle.fill",
+                                isEnabled: location.isEnabled,
+                                tint: .green
+                            ) {
+                                onLocationToggle(location)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+            }
+            .padding(.top, 8)
+
+            // Volume control
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Image(systemName: "speaker.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                    Slider(value: $volume, in: 0...1) { _ in
+                        onVolumeChange(volume)
+                    }
+                    Image(systemName: "speaker.wave.3.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                    Text("\(Int(volume * 100))%")
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .frame(width: 40)
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 8)
 
             // Debug info - visible at larger detents
-            if selectedDetent != .height(120) {
+            if selectedDetent != .height(180) {
                 VStack(spacing: 8) {
                     Divider()
                         .padding(.horizontal, 20)
@@ -329,6 +350,36 @@ struct BottomSheetContent: View {
     }
 }
 
+// Compact waypoint toggle chip
+struct WaypointChip: View {
+    let name: String
+    let icon: String
+    let isEnabled: Bool
+    let tint: Color
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                Text(name)
+                    .font(.system(size: 14, weight: .medium))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(isEnabled ? tint.opacity(0.2) : Color.gray.opacity(0.1))
+            .foregroundColor(isEnabled ? tint : .gray)
+            .cornerRadius(20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(isEnabled ? tint : Color.gray.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 struct CompassView_Previews: PreviewProvider {
     static var previews: some View {
         CompassView(
@@ -337,9 +388,7 @@ struct CompassView_Previews: PreviewProvider {
             headingAccuracy: 5,
             deviceHeading: 50,
             smoothedDeviceHeading: 50,
-            headOffset: -5,
-            volume: .constant(0.5),
-            onVolumeChange: { _ in }
+            headOffset: -5
         )
     }
 }
